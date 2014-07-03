@@ -12,7 +12,7 @@ import scala.collection.concurrent.TrieMap
 import com.qifun.jsonStream.AsynchronousJsonStream
 
 private object TextSession {
-  private val RequestHead0 = ByteBuffer.wrap("{\n\trequest: {\n\t\t\"".getBytes("UTF-8"))
+  private val RequestHead0 = ByteBuffer.wrap("{\n\t\"request\": {\n\t\t\"".getBytes("UTF-8"))
   private val RequestHead1 = ByteBuffer.wrap("\": ".getBytes("UTF-8"))
   private val RequestTail = ByteBuffer.wrap("\t}\n}\n".getBytes("UTF-8"))
 
