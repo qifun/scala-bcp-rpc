@@ -5,11 +5,11 @@ import scala.collection.mutable.Buffer
 import java.nio.ByteBuffer
 import haxe.io.Bytes
 
-object ByteBufferOutput {
+private[rpc] object ByteBufferOutput {
   final val PageSize = 128
 }
 
-final class ByteBufferOutput extends Output {
+private[rpc] final class ByteBufferOutput extends Output {
 
   val buffers = Buffer.empty[ByteBuffer]
 

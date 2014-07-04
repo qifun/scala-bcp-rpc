@@ -3,7 +3,7 @@ package com.qifun.qforce.bcp.rpc
 import com.qifun.jsonStream.JsonStream
 import com.qifun.jsonStream.JsonStreamPair
 
-object JsonStreamExtractor {
+private[rpc] object JsonStreamExtractor {
 
   private val JsonStreamObjectIndex = {
     haxe.root.Type.getEnumConstructs(classOf[JsonStream]).indexOf("OBJECT", 0)

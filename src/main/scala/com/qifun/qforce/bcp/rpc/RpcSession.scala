@@ -26,11 +26,11 @@ object RpcSession {
 
   }
 
-  private object IncomingProxyEntry {
+  object IncomingProxyEntry {
 
     import language.implicitConversions
 
-    implicit def fromFunction[ServiceInterface: ClassTag, S <: RpcSession](
+    implicit def apply[ServiceInterface: ClassTag, S <: RpcSession](
       newProxyFunction: S => IncomingProxyImpl[ServiceInterface]): IncomingProxyEntry[S] = {
       new IncomingProxyEntry(classTag[ServiceInterface].toString, newProxyFunction)
     }
@@ -72,15 +72,25 @@ trait RpcSession { _: BcpSession[_, _] =>
 
   protected def incomingProxyFactory: RpcSession.IncomingProxyFactory[_ >: this.type]
 
-  val nextRequestId = new AtomicInteger(0)
+  private val nextRequestId = new AtomicInteger(0)
 
-  val outgoingRpcResponseHandlers = TrieMap.empty[Int, Function]
+  private val outgoingRpcResponseHandlers = TrieMap.empty[Int, Function]
 
   protected def toByteBuffer(js: JsonStream): Seq[ByteBuffer]
 
   protected def toJsonStream(buffers: java.nio.ByteBuffer*): JsonStream
 
-  final def outgoingRpc[ServiceInterface: ClassTag](request: JsonStream, handler: Function): Unit = {
+  final class OutgoingProxyEntry[ServiceInterface: ClassTag] private[RpcSession] {
+    trait OutgoingProxyImpl { _: OutgoingProxy[ServiceInterface] =>
+      override protected final def outgoingRpc(i: JsonStream, o: Function): Unit = {
+        RpcSession.this.outgoingRpc[ServiceInterface](i, o)
+      }
+    }
+  }
+
+  final def send[ServiceInterface: ClassTag] = new OutgoingProxyEntry[ServiceInterface]
+
+  private final def outgoingRpc[ServiceInterface: ClassTag](request: JsonStream, handler: Function): Unit = {
     val requestId = nextRequestId.getAndIncrement()
     outgoingRpcResponseHandlers.putIfAbsent(requestId, handler) match {
       case None => {

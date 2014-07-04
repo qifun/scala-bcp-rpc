@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import haxe.io.Eof
 import haxe.lang.HaxeException
 
-final class ByteBufferInput(buffers: Iterator[ByteBuffer]) extends Input {
+private[rpc] final class ByteBufferInput(buffers: Iterator[ByteBuffer]) extends Input {
 
   var current: ByteBuffer = if (buffers.hasNext) {
     buffers.next()

@@ -2,9 +2,9 @@ package com.qifun.qforce.bcp.rpc
 import com.dongxiguo.continuation.utils.{ Generator => HaxeGenerator }
 import haxe.root.Reflect
 
-trait WrappedHaxeIterator[+Element] extends Iterator[Element]
+private[rpc] trait WrappedHaxeIterator[+Element] extends Iterator[Element]
 
-object WrappedHaxeIterator {
+private[rpc] object WrappedHaxeIterator {
 
   private final class WrappedHaxeGenerator[+Element](haxeGenerator: HaxeGenerator[Element]) extends WrappedHaxeIterator[Element] {
 
