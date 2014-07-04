@@ -5,6 +5,7 @@ import scala.runtime.BoxedUnit
 
 object Implicits {
 
+  import scala.language.implicitConversions
   /**
    * 把`future`转换成其运行时类型。
    * 
