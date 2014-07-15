@@ -16,7 +16,7 @@ import scala.util.control.Exception.Catcher
 import scala.collection.concurrent.TrieMap
 import com.qifun.jsonStream.JsonStreamPair
 import com.qifun.qforce.bcp.BcpSession
-import com.qifun.jsonStream.rpc.IJsonMethod
+import com.qifun.jsonStream.rpc.IJsonService
 import scala.runtime.BoxedUnit
 import scala.reflect.macros.blackbox.Context
 
@@ -24,7 +24,7 @@ object RpcSession {
 
   final class OutgoingProxyEntry[Service](
     private[RpcSession] val serviceTag: ClassTag[Service],
-    private[RpcSession] val outgoingView: IJsonMethod => Service)
+    private[RpcSession] val outgoingView: IJsonService => Service)
 
   object OutgoingProxyEntry {
 
@@ -98,17 +98,17 @@ object RpcSession {
   final class IncomingProxyEntry[S <: RpcSession, Service](
     private[RpcSession] val rpcFactory: S => Service,
     private[RpcSession] val serviceTag: ClassTag[Service],
-    private[RpcSession] val incomingView: Service => IJsonMethod)
+    private[RpcSession] val incomingView: Service => IJsonService)
 
   object IncomingProxyRegistration {
 
-    private def incomingRpc[S <: RpcSession, Service](rpcFactory: S => Service, incomingView: Service => IJsonMethod) = {
+    private def incomingRpc[S <: RpcSession, Service](rpcFactory: S => Service, incomingView: Service => IJsonService) = {
       { session: S =>
         incomingView(rpcFactory(session))
       }
     }
 
-    private def incomingRpc[S <: RpcSession, Service](entry: IncomingProxyEntry[S, Service]): S => IJsonMethod = {
+    private def incomingRpc[S <: RpcSession, Service](entry: IncomingProxyEntry[S, Service]): S => IJsonService = {
       incomingRpc(entry.rpcFactory, entry.incomingView)
     }
 
@@ -124,7 +124,7 @@ object RpcSession {
   }
 
   final class IncomingProxyRegistration[S <: RpcSession] private (
-    private[RpcSession] val incomingProxyMap: Map[String, S => IJsonMethod])
+    private[RpcSession] val incomingProxyMap: Map[String, S => IJsonService])
     extends AnyVal // Do not extends AnyVal because of https://issues.scala-lang.org/browse/SI-8702
 
   private def generator1[Element](element: Element) = {
@@ -160,7 +160,7 @@ trait RpcSession { _: BcpSession[_, _] =>
 
     val serviceClassName = entry.serviceTag.toString
 
-    entry.outgoingView(new IJsonMethod {
+    entry.outgoingView(new IJsonService {
       override final def apply(request: JsonStream, handler: IJsonResponseHandler): Unit = {
         val requestId = nextRequestId.getAndIncrement()
         outgoingRpcResponseHandlers.putIfAbsent(requestId, handler) match {
