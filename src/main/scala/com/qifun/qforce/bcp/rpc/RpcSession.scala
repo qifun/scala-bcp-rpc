@@ -33,13 +33,18 @@ object RpcSession {
 
     def apply_impl[Service](c: Context)(serviceTag: c.Expr[ClassTag[Service]]): c.Expr[OutgoingProxyEntry[Service]] = {
       import c.universe._
-      c.warning(c.enclosingPosition, show(c.macroApplication))
       val Apply(TypeApply(_, Seq(serviceType)), _) = c.macroApplication
       val methodNameBuilder = new StringBuilder
       methodNameBuilder ++= "outgoingProxy"
-      //            serviceType.tpe.typeSymbol.asClass.
-      // TODO 
-      ???
+      def buildMethodName(symbol: Symbol) {
+        val owner = symbol.owner
+        if (owner != NoSymbol) {
+          buildMethodName(owner)
+          methodNameBuilder += '_'
+          methodNameBuilder ++= symbol.name.toString
+        }
+      }
+      buildMethodName(serviceType.tpe.typeSymbol)
       val methodExpr = c.Expr(Ident(TermName(methodNameBuilder.toString)))
       reify {
         new _root_.com.qifun.qforce.bcp.rpc.RpcSession.OutgoingProxyEntry(serviceTag.splice, methodExpr.splice)
@@ -62,15 +67,19 @@ object RpcSession {
           serviceTag: c.Expr[ClassTag[Service]]): c.Expr[IncomingProxyEntry[S, Service]] = {
       import c.universe._
 
-      c.warning(c.enclosingPosition, showRaw(c.macroApplication))
-
       val Apply(Apply(TypeApply(_, Seq(_, serviceType)), _), _) = c.macroApplication
       val methodNameBuilder = new StringBuilder
       methodNameBuilder ++= "incomingProxy"
 
-      c.info(c.enclosingPosition, showRaw(serviceType.tpe.typeSymbol), true)
-
-      ???
+      def buildMethodName(symbol: Symbol) {
+        val owner = symbol.owner
+        if (owner != NoSymbol) {
+          buildMethodName(owner)
+          methodNameBuilder += '_'
+          methodNameBuilder ++= symbol.name.toString
+        }
+      }
+      buildMethodName(serviceType.tpe.typeSymbol)
       val methodExpr = c.Expr(Ident(TermName(methodNameBuilder.toString)))
       reify {
         new _root_.com.qifun.qforce.bcp.rpc.RpcSession.IncomingProxyEntry(
