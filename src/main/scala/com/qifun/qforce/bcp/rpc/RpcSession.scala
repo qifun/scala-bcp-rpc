@@ -61,10 +61,10 @@ object RpcSession {
     import scala.language.implicitConversions
     import scala.language.experimental.macros
 
-    def apply_impl[S <: RpcSession, Service](
+    def apply_impl[Session, Service](
       c: Context)(
-        rpcFactory: c.Expr[S => Service])(
-          serviceTag: c.Expr[ClassTag[Service]]): c.Expr[IncomingProxyEntry[S, Service]] = {
+        rpcFactory: c.Expr[Session => Service])(
+          serviceTag: c.Expr[ClassTag[Service]]): c.Expr[IncomingProxyEntry[Session, Service]] = {
       import c.universe._
 
       val Apply(Apply(TypeApply(_, Seq(_, serviceType)), _), _) = c.macroApplication
@@ -89,30 +89,30 @@ object RpcSession {
       }
     }
 
-    implicit def apply[S <: RpcSession, Service](
-      rpcFactory: S => Service)(
-        implicit serviceTag: ClassTag[Service]): IncomingProxyEntry[S, Service] = macro apply_impl[S, Service]
+    implicit def apply[Session, Service](
+      rpcFactory: Session => Service)(
+        implicit serviceTag: ClassTag[Service]): IncomingProxyEntry[Session, Service] = macro apply_impl[Session, Service]
 
   }
 
-  final class IncomingProxyEntry[S <: RpcSession, Service](
-    private[RpcSession] val rpcFactory: S => Service,
+  final class IncomingProxyEntry[Session, Service](
+    private[RpcSession] val rpcFactory: Session => Service,
     private[RpcSession] val serviceTag: ClassTag[Service],
     private[RpcSession] val incomingView: Service => IJsonService)
 
   object IncomingProxyRegistration {
 
-    private def incomingRpc[S <: RpcSession, Service](rpcFactory: S => Service, incomingView: Service => IJsonService) = {
-      { session: S =>
+    private def incomingRpc[Session, Service](rpcFactory: Session => Service, incomingView: Service => IJsonService) = {
+      { session: Session =>
         incomingView(rpcFactory(session))
       }
     }
 
-    private def incomingRpc[S <: RpcSession, Service](entry: IncomingProxyEntry[S, Service]): S => IJsonService = {
+    private def incomingRpc[Session, Service](entry: IncomingProxyEntry[Session, Service]): Session => IJsonService = {
       incomingRpc(entry.rpcFactory, entry.incomingView)
     }
 
-    final def apply[S <: RpcSession](incomingEntries: IncomingProxyEntry[S, _]*) = {
+    final def apply[Session](incomingEntries: IncomingProxyEntry[Session, _]*) = {
       val map = (for {
         entry <- incomingEntries
       } yield {
@@ -123,11 +123,11 @@ object RpcSession {
 
   }
 
-  final class IncomingProxyRegistration[S <: RpcSession] private (
-    private[RpcSession] val incomingProxyMap: Map[String, S => IJsonService])
+  final class IncomingProxyRegistration[Session] private (
+    private[RpcSession] val incomingProxyMap: Map[String, Session => IJsonService])
     extends AnyVal // Do not extends AnyVal because of https://issues.scala-lang.org/browse/SI-8702
 
-  private def generator1[Element](element: Element) = {
+  private final def generator1[Element](element: Element) = {
     new HaxeGenerator[Element](
       new haxe.lang.Function(2, 0) {
         override final def __hx_invoke2_o(
