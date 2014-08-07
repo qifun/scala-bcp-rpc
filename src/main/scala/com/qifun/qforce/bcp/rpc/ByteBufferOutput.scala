@@ -47,11 +47,11 @@ private[rpc] final class ByteBufferOutput extends Output {
       }
     }
     if (len < current.remaining) {
-      current.get(s.getData, pos, len)
+      current.put(s.getData, pos, len)
       len
     } else {
       val result = current.remaining
-      current.get(s.getData, pos, result)
+      current.put(s.getData, pos, result)
       result
     }
   }
