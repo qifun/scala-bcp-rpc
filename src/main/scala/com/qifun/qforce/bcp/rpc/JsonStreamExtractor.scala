@@ -31,7 +31,7 @@ private[rpc] object JsonStreamExtractor {
     final def unapply(jsonStream: JsonStream): Option[WrappedHaxeIterator[JsonStreamPair]] = {
       haxe.root.Type.enumIndex(jsonStream) match {
         case JsonStreamObjectIndex => {
-          Some(WrappedHaxeIterator(haxe.root.Type.enumParameters(0)).asInstanceOf[WrappedHaxeIterator[JsonStreamPair]])
+          Some(WrappedHaxeIterator(haxe.root.Type.enumParameters(jsonStream).__a(0)).asInstanceOf[WrappedHaxeIterator[JsonStreamPair]])
         }
         case _ => None
       }

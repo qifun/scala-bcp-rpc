@@ -13,11 +13,11 @@ private[rpc] final class ByteBufferInput(buffers: Iterator[ByteBuffer]) extends 
     null
   }
 
-  override final def readByte() = {
+  override final def readByte():Int = {
     if (current == null) {
       throw HaxeException.wrap(new Eof)
     } else {
-      var result = current.get()
+      var result = current.get().toInt & 0xFF
       if (current.remaining == 0) {
         current = if (buffers.hasNext) {
           buffers.next()

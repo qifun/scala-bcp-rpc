@@ -11,7 +11,7 @@ trait TextSession extends RpcSession { _: BcpSession[_, _] =>
   override protected final def toByteBuffer(js: JsonStream): Seq[ByteBuffer] = {
     val output = new ByteBufferOutput
     PrettyTextPrinter.print(output, js, 0)
-    output.buffers
+    output.result()
   }
 
   override protected final def toJsonStream(buffers: java.nio.ByteBuffer*): JsonStream = {

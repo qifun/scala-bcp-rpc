@@ -11,7 +11,16 @@ private[rpc] object ByteBufferOutput {
 
 private[rpc] final class ByteBufferOutput extends Output {
 
-  val buffers = Buffer.empty[ByteBuffer]
+  private val buffers = Buffer.empty[ByteBuffer]
+
+  /**
+   * Produces a collection from the added elements.
+   *
+   * The [[ByteBufferOutput]]'s contents are undefined after this operation.
+   */
+  def result(): Seq[ByteBuffer] = {
+    for (buffer <- buffers) yield buffer.flip().asInstanceOf[ByteBuffer]
+  }
 
   override def writeByte(b: Int) {
     val current = if (buffers.isEmpty) {

@@ -170,7 +170,7 @@ trait RpcSession { _: BcpSession[_, _] =>
               JsonStream.OBJECT(generator1(new JsonStreamPair(
                 requestId.toString,
                 JsonStream.OBJECT(generator1(new JsonStreamPair(serviceClassName, request)))))))))
-            send(toByteBuffer(request): _*)
+            send(toByteBuffer(requestStream): _*)
           }
           case Some(oldFunction) => {
             throw new IllegalStateException("")
