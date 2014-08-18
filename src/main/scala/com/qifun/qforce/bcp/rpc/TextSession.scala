@@ -10,6 +10,38 @@ import com.qifun.jsonStream.rpc.IJsonService
 import com.qifun.jsonStream.JsonStreamPair
 import com.qifun.jsonStream.rpc.IJsonResponseHandler
 
+/**
+ * 收到的包都是JSON格式的数据，有以下三种格式的包：
+ *   1. 请求
+ *     {
+ *         "request": {
+ *             "123": { //请求Id
+ *                 "myPacakge.IMyInterface": { 
+ *                     // 交给Haxe处理的数据
+ *                 }
+ *             }
+ *         }
+ *     }
+ *   
+ *   2. 失败回应
+ *     {
+ *         "failure": {
+ *             "123": { // 失败的请求Id
+ *                 // 交给Haxe处理的数据
+ *             }
+ *         }
+ *     }
+ *   
+ *   3. 成功回应
+ *     {
+ *         "success": {
+ *             "123": { // 失败的请求Id
+ *                 // 交给Haxe处理的数据
+ *             }
+ *         }
+ *     }
+ * 
+ */
 trait TextSession extends RpcSession { _: BcpSession[_, _] =>
 
   import RpcSession.generator1
