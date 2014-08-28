@@ -10,19 +10,25 @@ import com.qifun.jsonStream.rpc.IJsonService
 import com.qifun.jsonStream.JsonStreamPair
 import com.qifun.jsonStream.rpc.IJsonResponseHandler
 
+private object TextSession {
+
+  private implicit val (logger, formatter, appender) = ZeroLoggerFactory.newLogger(this)
+
+}
+
 /**
  * 收到的包都是JSON格式的数据，有以下三种格式的包：
  *   1. 请求
  *     {
  *         "request": {
  *             "123": { //请求Id
- *                 "myPacakge.IMyInterface": { 
+ *                 "myPacakge.IMyInterface": {
  *                     // 交给Haxe处理的数据
  *                 }
  *             }
  *         }
  *     }
- *   
+ *
  *   2. 失败回应
  *     {
  *         "failure": {
@@ -31,7 +37,7 @@ import com.qifun.jsonStream.rpc.IJsonResponseHandler
  *             }
  *         }
  *     }
- *   
+ *
  *   3. 成功回应
  *     {
  *         "success": {
@@ -40,10 +46,11 @@ import com.qifun.jsonStream.rpc.IJsonResponseHandler
  *             }
  *         }
  *     }
- * 
+ *
  */
 trait TextSession extends RpcSession { _: BcpSession[_, _] =>
 
+  import TextSession._
   import RpcSession.generator1
 
   override protected final def toByteBuffer(js: JsonStream): Seq[ByteBuffer] = {
@@ -97,7 +104,8 @@ trait TextSession extends RpcSession { _: BcpSession[_, _] =>
                         for (servicePair <- servicePairs) {
                           incomingServices.incomingProxyMap.get(servicePair.key) match {
                             case None => {
-                              throw new RpcException.UnknownServiceName
+                              logger.severe("Unknown service name")
+                              interrupt()
                             }
                             case Some(incomingRpc) => {
                               incomingRpc(this).apply(
@@ -125,13 +133,15 @@ trait TextSession extends RpcSession { _: BcpSession[_, _] =>
                         }
                       }
                       case _ => {
-                        throw new RpcException.IllegalRpcData
+                        logger.severe("Illegal rpc data!")
+                        interrupt()
                       }
                     }
                   }
                 }
                 case _ => {
-                  throw new RpcException.IllegalRpcData
+                  logger.severe("Illegal rpc data!")
+                  interrupt()
                 }
               }
             }
@@ -143,12 +153,14 @@ trait TextSession extends RpcSession { _: BcpSession[_, _] =>
                       idPair.key.toInt
                     } catch {
                       case e: NumberFormatException => {
+                        interrupt()
                         throw new RpcException.IllegalRpcData(cause = e)
                       }
                     }
                     outgoingRpcResponseHandlers.remove(id) match {
                       case None => {
-                        throw new RpcException.IllegalRpcData
+                        logger.severe("Illegal rpc data!")
+                        interrupt()
                       }
                       case Some(handler) => {
                         handler.onFailure(idPair.value)
@@ -157,7 +169,8 @@ trait TextSession extends RpcSession { _: BcpSession[_, _] =>
                   }
                 }
                 case _ => {
-                  throw new RpcException.IllegalRpcData
+                  logger.severe("Illegal rpc data!")
+                  interrupt()
                 }
               }
 
@@ -170,12 +183,14 @@ trait TextSession extends RpcSession { _: BcpSession[_, _] =>
                       idPair.key.toInt
                     } catch {
                       case e: NumberFormatException => {
+                        interrupt()
                         throw new RpcException.IllegalRpcData(cause = e)
                       }
                     }
                     outgoingRpcResponseHandlers.remove(id) match {
                       case None => {
-                        throw new RpcException.IllegalRpcData
+                        logger.severe("Illegal rpc data!")
+                        interrupt()
                       }
                       case Some(handler) => {
                         handler.onSuccess(idPair.value)
@@ -184,18 +199,21 @@ trait TextSession extends RpcSession { _: BcpSession[_, _] =>
                   }
                 }
                 case _ => {
-                  throw new RpcException.IllegalRpcData
+                  logger.severe("Illegal rpc data!")
+                  interrupt()
                 }
               }
             }
             case _ => {
-              throw new RpcException.IllegalRpcData
+              logger.severe("Illegal rpc data!")
+              interrupt()
             }
           }
         }
       }
       case _ => {
-        throw new RpcException.IllegalRpcData
+        logger.severe("Illegal rpc data!")
+        interrupt()
       }
     }
   }
