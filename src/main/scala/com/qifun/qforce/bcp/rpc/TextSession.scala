@@ -26,11 +26,25 @@ import com.dongxiguo.continuation.utils.{ Generator => HaxeGenerator }
 import com.qifun.jsonStream.rpc.IJsonService
 import com.qifun.jsonStream.JsonStreamPair
 import com.qifun.jsonStream.rpc.IJsonResponseHandler
+import scala.collection.concurrent.TrieMap
+import java.util.concurrent.atomic.AtomicInteger
 
 private object TextSession {
 
   private implicit val (logger, formatter, appender) = ZeroLoggerFactory.newLogger(this)
 
+  private final def generator1[Element](element: Element) = {
+    new HaxeGenerator[Element](
+      new haxe.lang.Function(2, 0) {
+        override final def __hx_invoke2_o(
+          argumentValue0: Double, argumentRef0: AnyRef,
+          argumentValue1: Double, argumentRef1: AnyRef) = {
+          val yieldFunction = argumentRef0.asInstanceOf[haxe.lang.Function]
+          val returnFunction = argumentRef1.asInstanceOf[haxe.lang.Function]
+          yieldFunction.__hx_invoke2_o(0, element, 0, returnFunction)
+        }
+      })
+  }
 }
 
 /**
@@ -68,8 +82,11 @@ private object TextSession {
 trait TextSession extends RpcSession { _: BcpSession[_, _] =>
 
   import TextSession._
-  import RpcSession.generator1
 
+  private val nextRequestId = new AtomicInteger(0)
+
+  private val outgoingRpcResponseHandlers = TrieMap.empty[Int, IJsonResponseHandler]
+  
   private def toByteBuffer(js: JsonStream): Seq[ByteBuffer] = {
     val output = new ByteBufferOutput
     PrettyTextPrinter.print(output, js, 0)

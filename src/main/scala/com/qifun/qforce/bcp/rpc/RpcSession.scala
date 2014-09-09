@@ -22,15 +22,12 @@ import haxe.lang.Function
 import com.qifun.qforce.bcp.BcpServer
 import com.qifun.jsonStream.rpc.OutgoingProxy
 import com.qifun.jsonStream.rpc.IncomingProxy
-import scala.reflect.classTag
 import scala.reflect.ClassTag
 import com.qifun.jsonStream.JsonStream
-import java.util.concurrent.atomic.AtomicInteger
 import com.qifun.statelessFuture.util.Generator
 import com.dongxiguo.continuation.utils.{ Generator => HaxeGenerator }
 import java.nio.ByteBuffer
 import scala.util.control.Exception.Catcher
-import scala.collection.concurrent.TrieMap
 import com.qifun.jsonStream.JsonStreamPair
 import com.qifun.qforce.bcp.BcpSession
 import com.qifun.jsonStream.rpc.IJsonService
@@ -144,29 +141,11 @@ object RpcSession {
     private[rpc] val incomingProxyMap: Map[String, Session => IJsonService])
     extends AnyVal // Do not extends AnyVal because of https://issues.scala-lang.org/browse/SI-8702
 
-  private[rpc] final def generator1[Element](element: Element) = {
-    new HaxeGenerator[Element](
-      new haxe.lang.Function(2, 0) {
-        override final def __hx_invoke2_o(
-          argumentValue0: Double, argumentRef0: AnyRef,
-          argumentValue1: Double, argumentRef1: AnyRef) = {
-          val yieldFunction = argumentRef0.asInstanceOf[haxe.lang.Function]
-          val returnFunction = argumentRef1.asInstanceOf[haxe.lang.Function]
-          yieldFunction.__hx_invoke2_o(0, element, 0, returnFunction)
-        }
-      })
-  }
 }
 
 trait RpcSession { _: BcpSession[_, _] =>
 
-  import RpcSession.generator1
-
   protected def incomingServices: RpcSession.IncomingProxyRegistration[_ >: this.type]
-
-  private[rpc] val nextRequestId = new AtomicInteger(0)
-
-  private[rpc] val outgoingRpcResponseHandlers = TrieMap.empty[Int, IJsonResponseHandler]
   
   def outgoingService[Service](implicit entry: RpcSession.OutgoingProxyEntry[Service]): Service
 
