@@ -170,8 +170,4 @@ trait RpcSession { _: BcpSession[_, _] =>
   
   def outgoingService[Service](implicit entry: RpcSession.OutgoingProxyEntry[Service]): Service
 
-  protected def toByteBuffer(js: JsonStream): Seq[ByteBuffer]
-
-  protected def toJsonStream(buffers: java.nio.ByteBuffer*): JsonStream
-
 } 

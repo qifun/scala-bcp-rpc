@@ -70,13 +70,13 @@ trait TextSession extends RpcSession { _: BcpSession[_, _] =>
   import TextSession._
   import RpcSession.generator1
 
-  override protected final def toByteBuffer(js: JsonStream): Seq[ByteBuffer] = {
+  private def toByteBuffer(js: JsonStream): Seq[ByteBuffer] = {
     val output = new ByteBufferOutput
     PrettyTextPrinter.print(output, js, 0)
     output.result()
   }
 
-  override protected final def toJsonStream(buffers: java.nio.ByteBuffer*): JsonStream = {
+  private def toJsonStream(buffers: java.nio.ByteBuffer*): JsonStream = {
     TextParser.parseInput(new ByteBufferInput(buffers.iterator))
   }
 
