@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.qifun.qforce.bcp.rpc
+package com.qifun.bcp.rpc
 
 import com.qifun.statelessFuture._
 import scala.runtime.BoxedUnit

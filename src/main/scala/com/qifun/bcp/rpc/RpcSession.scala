@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 
-package com.qifun.qforce.bcp.rpc
+package com.qifun.bcp.rpc
 
 import com.qifun.jsonStream.rpc.IJsonResponseHandler
 import haxe.lang.Function
-import com.qifun.qforce.bcp.BcpServer
+import com.qifun.bcp.BcpServer
 import com.qifun.jsonStream.rpc.OutgoingProxy
 import com.qifun.jsonStream.rpc.IncomingProxy
 import scala.reflect.ClassTag
@@ -29,7 +29,7 @@ import com.dongxiguo.continuation.utils.{ Generator => HaxeGenerator }
 import java.nio.ByteBuffer
 import scala.util.control.Exception.Catcher
 import com.qifun.jsonStream.JsonStreamPair
-import com.qifun.qforce.bcp.BcpSession
+import com.qifun.bcp.BcpSession
 import com.qifun.jsonStream.rpc.IJsonService
 import scala.runtime.BoxedUnit
 import scala.reflect.macros.blackbox.Context
@@ -61,7 +61,7 @@ object RpcSession {
       buildMethodName(serviceType.tpe.typeSymbol)
       val methodExpr = c.Expr(Ident(TermName(methodNameBuilder.toString)))
       reify {
-        new _root_.com.qifun.qforce.bcp.rpc.RpcSession.OutgoingProxyEntry(serviceTag.splice, methodExpr.splice)
+        new _root_.com.qifun.bcp.rpc.RpcSession.OutgoingProxyEntry(serviceTag.splice, methodExpr.splice)
       }
     }
 
@@ -96,7 +96,7 @@ object RpcSession {
       buildMethodName(serviceType.tpe.typeSymbol)
       val methodExpr = c.Expr(Ident(TermName(methodNameBuilder.toString)))
       reify {
-        new _root_.com.qifun.qforce.bcp.rpc.RpcSession.IncomingProxyEntry(
+        new _root_.com.qifun.bcp.rpc.RpcSession.IncomingProxyEntry(
           rpcFactory.splice,
           serviceTag.splice,
           methodExpr.splice)

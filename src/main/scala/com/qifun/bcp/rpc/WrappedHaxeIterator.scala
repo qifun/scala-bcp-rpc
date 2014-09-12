@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.qifun.qforce.bcp.rpc
+package com.qifun.bcp.rpc
 import com.dongxiguo.continuation.utils.{ Generator => HaxeGenerator }
 import haxe.root.Reflect
 

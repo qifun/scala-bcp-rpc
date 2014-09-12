@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.qifun.qforce.bcp.rpc
+package com.qifun.bcp.rpc
 
 import haxe.io.Output
 import scala.collection.mutable.Buffer

@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 
-package com.qifun.qforce.bcp.rpc
+package com.qifun.bcp.rpc
 
 import java.nio.ByteBuffer
 import com.qifun.jsonStream.JsonStream
 import com.qifun.jsonStream.io.PrettyTextPrinter
 import com.qifun.jsonStream.io.TextParser
-import com.qifun.qforce.bcp.BcpSession
+import com.qifun.bcp.BcpSession
 import com.dongxiguo.continuation.utils.{ Generator => HaxeGenerator }
 import com.qifun.jsonStream.rpc.IJsonService
 import com.qifun.jsonStream.JsonStreamPair
