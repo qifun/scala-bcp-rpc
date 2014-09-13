@@ -10,7 +10,7 @@ libraryDependencies += "com.qifun" %% "scala-bcp" % "0.1.0"
 
 scalacOptions += "-feature"
 
-version := "0.1.0"
+version := "0.1.1-SNAPSHOT"
 
 crossScalaVersions := Seq("2.11.2")
 
