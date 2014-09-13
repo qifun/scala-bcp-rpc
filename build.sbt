@@ -10,6 +10,8 @@ libraryDependencies += "com.qifun" %% "scala-bcp" % "0.1.0"
 
 scalacOptions += "-feature"
 
+version := "0.1.0"
+
 crossScalaVersions := Seq("2.11.2")
 
 organization := "com.qifun"
