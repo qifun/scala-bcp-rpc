@@ -32,7 +32,7 @@ import com.qifun.jsonStream.JsonStreamPair
 import com.qifun.bcp.BcpSession
 import com.qifun.jsonStream.rpc.IJsonService
 import scala.runtime.BoxedUnit
-import scala.reflect.macros.blackbox.Context
+import scala.reflect.macros.Context
 
 object RpcSession {
 
