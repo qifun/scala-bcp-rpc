@@ -4,15 +4,15 @@ resolvers in ThisBuild += "Typesafe repository releases" at "http://repo.typesaf
 
 libraryDependencies += "com.qifun" %% "stateless-future-util" % "0.5.0"
 
-libraryDependencies += "com.qifun" %% "json-stream" % "0.1.0"
+libraryDependencies += "com.qifun" %% "json-stream" % "0.2.0-SNAPSHOT"
 
 libraryDependencies += "com.qifun" %% "scala-bcp" % "0.1.0"
 
 scalacOptions += "-feature"
 
-version := "0.1.1-SNAPSHOT"
+version := "0.2.0-SNAPSHOT"
 
-crossScalaVersions := Seq("2.11.2")
+crossScalaVersions := Seq("2.10.4", "2.11.2")
 
 organization := "com.qifun"
 

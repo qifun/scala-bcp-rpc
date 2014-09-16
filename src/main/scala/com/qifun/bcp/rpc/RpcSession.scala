@@ -32,7 +32,7 @@ import com.qifun.jsonStream.JsonStreamPair
 import com.qifun.bcp.BcpSession
 import com.qifun.jsonStream.rpc.IJsonService
 import scala.runtime.BoxedUnit
-import scala.reflect.macros.blackbox.Context
+import scala.reflect.macros.Context
 
 object RpcSession {
 
@@ -59,7 +59,7 @@ object RpcSession {
         }
       }
       buildMethodName(serviceType.tpe.typeSymbol)
-      val methodExpr = c.Expr(Ident(TermName(methodNameBuilder.toString)))
+      val methodExpr = c.Expr(Ident(newTermName(methodNameBuilder.toString)))
       reify {
         new _root_.com.qifun.bcp.rpc.RpcSession.OutgoingProxyEntry(serviceTag.splice, methodExpr.splice)
       }
@@ -94,7 +94,7 @@ object RpcSession {
         }
       }
       buildMethodName(serviceType.tpe.typeSymbol)
-      val methodExpr = c.Expr(Ident(TermName(methodNameBuilder.toString)))
+      val methodExpr = c.Expr(Ident(newTermName(methodNameBuilder.toString)))
       reify {
         new _root_.com.qifun.bcp.rpc.RpcSession.IncomingProxyEntry(
           rpcFactory.splice,
@@ -138,7 +138,7 @@ object RpcSession {
   }
 
   final class IncomingProxyRegistration[Session] private (
-    private[rpc] val incomingProxyMap: Map[String, Session => IJsonService])
+    val incomingProxyMap: Map[String, Session => IJsonService])
     extends AnyVal // Do not extends AnyVal because of https://issues.scala-lang.org/browse/SI-8702
 
 }
