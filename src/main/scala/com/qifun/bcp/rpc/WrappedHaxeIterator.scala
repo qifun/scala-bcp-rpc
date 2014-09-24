@@ -27,7 +27,7 @@ private[rpc] object WrappedHaxeIterator {
 
     override final def hasNext = haxeGenerator.hasNext
 
-    override final def next() = haxeGenerator.next()
+    override final def next() = haxeGenerator.next().asInstanceOf[Element]
 
   }
 
