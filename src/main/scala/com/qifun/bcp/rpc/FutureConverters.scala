@@ -18,7 +18,6 @@
 package com.qifun.bcp.rpc
 
 import com.qifun.statelessFuture._
-import scala.runtime.BoxedUnit
 import scala.util.control.Exception.Catcher
 import scala.util.control.TailCalls.TailRec
 import com.qifun.jsonStream.rpc.IFuture
@@ -28,29 +27,25 @@ import haxe.lang.HaxeException
 
 object FutureConverters {
 
-  import scala.language.implicitConversions
-
   /**
    * 把`future`转换成其运行时类型。
    *
    * 由于Haxe生成的Java代码不支持Scala的[[Unit]]类型，所以只能使用运行时类型。
    * 当在Scala中实现Haxe生成的接口时，如果涉及上述运行时类型，就必须进行本转换，编译器才会放行。
    */
-  implicit def statelessFutureToHaxeFuture[AwaitResult](future: Future[AwaitResult]): IFuture[AwaitResult] = {
-    new IFuture[AwaitResult] {
-      override final def start(completeHandler: ICompleteHandler[AwaitResult]) = {
-        (future.onComplete { result =>
-          completeHandler.onSuccess(result)
+  implicit final class StatelessFutureToHaxeFuture[AwaitResult](future: Future[AwaitResult]) extends IFuture[AwaitResult] {
+    override final def start(completeHandler: ICompleteHandler[AwaitResult]) = {
+      (future.onComplete { result =>
+        completeHandler.onSuccess(result)
+        TailCalls.done(())
+      } {
+        case haxeException: HaxeException =>
+          completeHandler.onFailure(haxeException.getObject())
           TailCalls.done(())
-        } {
-          case haxeException: HaxeException =>
-            completeHandler.onFailure(haxeException.getObject())
-            TailCalls.done(())
-          case notHaxeException: Exception =>
-            completeHandler.onFailure(notHaxeException)
-            TailCalls.done(())
-        }).result
-      }
+        case notHaxeException: Exception =>
+          completeHandler.onFailure(notHaxeException)
+          TailCalls.done(())
+      }).result
     }
   }
 
@@ -60,30 +55,26 @@ object FutureConverters {
    * 由于Haxe生成的Java代码不支持Scala的[[Unit]]类型，所以只能使用运行时类型。
    * 当在Scala中实现Haxe生成的接口时，如果涉及上述运行时类型，就必须进行本转换，编译器才会放行。
    */
-  implicit def haxeFutureToStatelessFuture[AwaitResult](haxeFuture: IFuture[AwaitResult]): Future[AwaitResult] = {
-    new Future.Stateless[AwaitResult] {
-      override final def onComplete(handler: AwaitResult => TailRec[Unit])(implicit catcher: Catcher[TailRec[Unit]]): TailRec[Unit] = {
-        haxeFuture.start(new ICompleteHandler[AwaitResult] {
-          override final def onSuccess(awaitResult: AwaitResult) = {
-            handler(awaitResult).result
-          }
-          override final def onFailure(error: AnyRef) = {
-            error match {
-              case throwable: Throwable => {
-                catcher(throwable).result
-              }
-              case notThrowable => {
-                catcher(HaxeException.wrap(notThrowable)).result
-              }
+  implicit final class HaxeFutureToStatelessFuture[AwaitResult](haxeFuture: IFuture[AwaitResult]) extends Future.Stateless[AwaitResult] {
+    override final def onComplete(handler: AwaitResult => TailRec[Unit])(implicit catcher: Catcher[TailRec[Unit]]): TailRec[Unit] = {
+      haxeFuture.start(new ICompleteHandler[AwaitResult] {
+        override final def onSuccess(awaitResult: AwaitResult) = {
+          handler(awaitResult).result
+        }
+        override final def onFailure(error: AnyRef) = {
+          error match {
+            case throwable: Throwable => {
+              catcher(throwable).result
             }
-
+            case notThrowable => {
+              catcher(HaxeException.wrap(notThrowable)).result
+            }
           }
-        })
-        TailCalls.done(())
-      }
 
+        }
+      })
+      TailCalls.done(())
     }
-    //future.asInstanceOf[Future[AwaitResult]]
   }
 
 }
