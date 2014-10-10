@@ -36,9 +36,9 @@ import scala.reflect.macros.Context
 
 object RpcSession {
 
-  final class OutgoingProxyEntry[Service](
-    private[rpc] val serviceTag: ClassTag[Service],
-    private[rpc] val outgoingView: IJsonService => Service)
+  final case class OutgoingProxyEntry[Service](
+    serviceTag: ClassTag[Service],
+    outgoingView: IJsonService => Service)
 
   object OutgoingProxyEntry {
 
@@ -109,10 +109,10 @@ object RpcSession {
 
   }
 
-  final class IncomingProxyEntry[Session, Service](
-    private[RpcSession] val rpcFactory: Session => Service,
-    private[RpcSession] val serviceTag: ClassTag[Service],
-    private[RpcSession] val incomingView: Service => IJsonService)
+  final case class IncomingProxyEntry[Session, Service](
+    rpcFactory: Session => Service,
+    serviceTag: ClassTag[Service],
+    incomingView: Service => IJsonService)
 
   object IncomingProxyRegistration {
 
