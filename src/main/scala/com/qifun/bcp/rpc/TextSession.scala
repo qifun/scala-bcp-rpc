@@ -223,7 +223,7 @@ trait TextSession extends RpcSession { _: BcpSession[_, _] =>
                     }
                     outgoingRpcResponseHandlers.remove(id) match {
                       case None => {
-                        logger.severe("Illegal rpc data!")
+                        logger.severe(this + " Illegal rpc data: " + id)
                         interrupt()
                       }
                       case Some(handler) => {
