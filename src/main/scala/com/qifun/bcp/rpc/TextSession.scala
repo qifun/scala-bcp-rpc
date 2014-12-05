@@ -48,7 +48,7 @@ private object TextSession {
 }
 
 /**
- * 收到的包都是JSON格式的数据，有以下三种格式的包：
+ * 收到的包都是JSON格式的数据，有以下四种格式的包：
  *   1. 请求
  *     {
  *         "request": {
@@ -77,6 +77,15 @@ private object TextSession {
  *             }
  *         }
  *     }
+ *     
+ *   4. 单向推送数据
+ *     {
+ *         "push": {
+ *             "myPacakge.IMyInterface": {
+ *                 // 交给Haxe处理的数据
+ *             }
+ *         }
+ *     }
  *
  */
 trait TextSession extends RpcSession { _: BcpSession[_, _] =>
@@ -86,7 +95,7 @@ trait TextSession extends RpcSession { _: BcpSession[_, _] =>
   private val nextRequestId = new AtomicInteger(0)
 
   private val outgoingRpcResponseHandlers = TrieMap.empty[Int, IJsonResponseHandler]
-  
+
   private def toByteBuffer(js: JsonStream): Seq[ByteBuffer] = {
     val output = new ByteBufferOutput
     PrettyTextPrinter.print(output, js, 0)
@@ -103,6 +112,14 @@ trait TextSession extends RpcSession { _: BcpSession[_, _] =>
     val serviceClassName = entry.serviceTag.toString
 
     entry.outgoingView(new IJsonService {
+
+      override final def push(data: JsonStream): Unit = {
+        val pushStream = JsonStream.OBJECT(generator1(new JsonStreamPair(
+          "push",
+          JsonStream.OBJECT(generator1(new JsonStreamPair(serviceClassName, data))))))
+        send(toByteBuffer(pushStream): _*)
+      }
+
       override final def apply(request: JsonStream, handler: IJsonResponseHandler): Unit = {
         val requestId = nextRequestId.getAndIncrement()
         outgoingRpcResponseHandlers.putIfAbsent(requestId, handler) match {
@@ -128,6 +145,27 @@ trait TextSession extends RpcSession { _: BcpSession[_, _] =>
       case JsonStreamExtractor.Object(requestOrResponsePairs) => {
         for (requestOrResponsePair <- requestOrResponsePairs) {
           requestOrResponsePair.key match {
+            case "push" => {
+              requestOrResponsePair.value match {
+                case JsonStreamExtractor.Object(servicePairs) => {
+                  for (servicePair <- servicePairs) {
+                    incomingServices.incomingProxyMap.get(servicePair.key) match {
+                      case None => {
+                        logger.severe("Unknown service name")
+                        interrupt()
+                      }
+                      case Some(incomingRpc) => {
+                        incomingRpc(this).push(servicePair.value)
+                      }
+                    }
+                  }
+                }
+                case _ => {
+                  logger.severe("Illegal rpc data!")
+                  interrupt()
+                }
+              }
+            }
             case "request" => {
               requestOrResponsePair.value match {
                 case JsonStreamExtractor.Object(idPairs) => {
