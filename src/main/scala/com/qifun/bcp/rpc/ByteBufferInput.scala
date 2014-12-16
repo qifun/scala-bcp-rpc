@@ -17,14 +17,12 @@
 
 package com.qifun.bcp.rpc
 
-import haxe.io.Input
 import java.nio.ByteBuffer
-import haxe.io.Eof
-import haxe.lang.HaxeException
 import scala.util.control.Exception
 import scala.annotation.tailrec
+import java.io.EOFException
 
-private[rpc] final class ByteBufferInput(buffers: Iterator[ByteBuffer]) extends Input {
+private[rpc] final class ByteBufferInput(buffers: Iterator[ByteBuffer]) {
 
   var current: ByteBuffer = if (buffers.hasNext) {
     buffers.next()
@@ -33,9 +31,9 @@ private[rpc] final class ByteBufferInput(buffers: Iterator[ByteBuffer]) extends 
   }
 
   @tailrec
-  override final def readByte(): Int = {
+  final def readByte(): Int = {
     if (current == null) {
-      throw HaxeException.wrap(new Eof)
+      throw new EOFException
     } else {
       if (current.remaining() == 0) {
         if (buffers.hasNext) {
@@ -57,17 +55,25 @@ private[rpc] final class ByteBufferInput(buffers: Iterator[ByteBuffer]) extends 
       }
     }
   }
+  
+  final def readInt(): Int = {
+    (readByte() << 24) | (readByte() << 16) | (readByte() << 8) | readByte()
+  }
+  
+  final def readShort(): Short = {
+    ((readByte() << 8) | readByte()).toShort
+  }
 
-  override final def readBytes(s: haxe.io.Bytes, pos: Int, len: Int) = {
+  final def readBytes(buffer: ByteBuffer, pos: Int, len: Int) = {
     if (current == null) {
-      throw HaxeException.wrap(new Eof)
+      throw new EOFException
     } else {
       if (len < current.remaining) {
-        current.get(s.getData, pos, len)
+        current.get(buffer.array, pos, len)
         len
       } else {
         val result = current.remaining
-        current.get(s.getData, pos, result)
+        current.get(buffer.array, pos, result)
         if (current.remaining == 0) {
           current = if (buffers.hasNext) {
             buffers.next()
