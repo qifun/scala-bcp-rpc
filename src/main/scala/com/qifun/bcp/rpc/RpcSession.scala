@@ -17,136 +17,221 @@
 
 package com.qifun.bcp.rpc
 
-import com.qifun.jsonStream.rpc.IJsonResponseHandler
-import haxe.lang.Function
 import com.qifun.bcp.BcpServer
-import com.qifun.jsonStream.rpc.OutgoingProxy
-import com.qifun.jsonStream.rpc.IncomingProxy
 import scala.reflect.ClassTag
-import com.qifun.jsonStream.JsonStream
 import com.qifun.statelessFuture.util.Generator
-import com.dongxiguo.continuation.utils.{ Generator => HaxeGenerator }
 import java.nio.ByteBuffer
 import scala.util.control.Exception.Catcher
-import com.qifun.jsonStream.JsonStreamPair
 import com.qifun.bcp.BcpSession
-import com.qifun.jsonStream.rpc.IJsonService
 import scala.runtime.BoxedUnit
 import scala.reflect.macros.Context
+import net.sandrogrzicic.scalabuff.Message
+import com.qifun.statelessFuture.Future
+import java.util.concurrent.atomic.AtomicInteger
+import scala.collection.concurrent.TrieMap
+import scala.reflect.runtime.universe
+import scala.reflect.runtime.universe._
+import com.google.protobuf.GeneratedMessageLite
+import java.lang.reflect.InvocationTargetException
+import com.qifun.common.myDemo.DemoRequest
 
 object RpcSession {
 
-  final case class OutgoingProxyEntry[Service](
-    serviceTag: ClassTag[Service],
-    outgoingView: IJsonService => Service)
+  private implicit val (logger, formatter, appender) = ZeroLoggerFactory.newLogger(this)
 
-  object OutgoingProxyEntry {
-
-    import scala.language.implicitConversions
-    import scala.language.experimental.macros
-
-    def apply_impl[Service](c: Context)(serviceTag: c.Expr[ClassTag[Service]]): c.Expr[OutgoingProxyEntry[Service]] = {
-      import c.universe._
-      val Apply(TypeApply(_, Seq(serviceType)), _) = c.macroApplication
-      val methodNameBuilder = new StringBuilder
-      methodNameBuilder ++= "outgoingProxy"
-      def buildMethodName(symbol: Symbol) {
-        val owner = symbol.owner
-        if (owner != NoSymbol) {
-          buildMethodName(owner)
-          methodNameBuilder += '_'
-          methodNameBuilder ++= symbol.name.toString
-        }
-      }
-      buildMethodName(serviceType.tpe.typeSymbol)
-      val methodExpr = c.Expr(Ident(newTermName(methodNameBuilder.toString)))
-      reify {
-        new _root_.com.qifun.bcp.rpc.RpcSession.OutgoingProxyEntry(serviceTag.splice, methodExpr.splice)
-      }
-    }
-
-    implicit def apply[Service](
-      implicit serviceTag: ClassTag[Service]): OutgoingProxyEntry[Service] = macro apply_impl[Service]
-
-  }
-
-  object IncomingProxyEntry {
-
-    import scala.language.implicitConversions
-    import scala.language.experimental.macros
-
-    def apply_impl[Session, Service](
-      c: Context)(
-        rpcFactory: c.Expr[Session => Service])(
-          serviceTag: c.Expr[ClassTag[Service]]): c.Expr[IncomingProxyEntry[Session, Service]] = {
-      import c.universe._
-
-      val Apply(Apply(TypeApply(_, Seq(_, serviceType)), _), _) = c.macroApplication
-      val methodNameBuilder = new StringBuilder
-      methodNameBuilder ++= "incomingProxy"
-
-      def buildMethodName(symbol: Symbol) {
-        val owner = symbol.owner
-        if (owner != NoSymbol) {
-          buildMethodName(owner)
-          methodNameBuilder += '_'
-          methodNameBuilder ++= symbol.name.toString
-        }
-      }
-      buildMethodName(serviceType.tpe.typeSymbol)
-      val methodExpr = c.Expr(Ident(newTermName(methodNameBuilder.toString)))
-      reify {
-        new _root_.com.qifun.bcp.rpc.RpcSession.IncomingProxyEntry(
-          rpcFactory.splice,
-          serviceTag.splice,
-          methodExpr.splice)
-      }
-    }
-
-    implicit def apply[Session, Service](
-      rpcFactory: Session => Service)(
-        implicit serviceTag: ClassTag[Service]): IncomingProxyEntry[Session, Service] = macro apply_impl[Session, Service]
-
-  }
-
-  final case class IncomingProxyEntry[Session, Service](
-    rpcFactory: Session => Service,
-    serviceTag: ClassTag[Service],
-    incomingView: Service => IJsonService)
+  final case class IncomingProxyEntry[Service <: IService](module: String, incomingService: Service)
 
   object IncomingProxyRegistration {
-
-    private def incomingRpc[Session, Service](rpcFactory: Session => Service, incomingView: Service => IJsonService) = {
-      { session: Session =>
-        incomingView(rpcFactory(session))
-      }
-    }
-
-    private def incomingRpc[Session, Service](entry: IncomingProxyEntry[Session, Service]): Session => IJsonService = {
-      incomingRpc(entry.rpcFactory, entry.incomingView)
-    }
-
-    final def apply[Session](incomingEntries: IncomingProxyEntry[Session, _]*) = {
+    final def apply[Service <: IService](incomingEntries: IncomingProxyEntry[Service]*) = {
       val map = (for {
         entry <- incomingEntries
       } yield {
-        entry.serviceTag.toString -> incomingRpc(entry)
+        entry.module -> entry.incomingService
       })(collection.breakOut(Map.canBuildFrom))
       new IncomingProxyRegistration(map)
     }
-
   }
 
-  final class IncomingProxyRegistration[Session] private (
-    val incomingProxyMap: Map[String, Session => IJsonService])
+  final class IncomingProxyRegistration private (val incomingProxyMap: Map[String, IService])
     extends AnyVal // Do not extends AnyVal because of https://issues.scala-lang.org/browse/SI-8702
+
+  private[rpc] val REQUEST = 0
+  private[rpc] val SUCCESS = 1
+  private[rpc] val FAIL = 2
+  private[rpc] val EVENT = 3
+  private[rpc] val INFO = 4
 
 }
 
+/**
+ * data format:
+ * 32bit(Inc) + 8bit(Type) + 8bit(NameSize) + 32bit(MessageSize) + raw_byte(MessageName) + raw_byte(Protobuf)
+ * Inc: Incremental id
+ * Type: 0: REQUEST; 1: SUCCESS; 2: FAIL; 3: EVENT; 4: INFO;
+ * NameSize: The size of MessageName
+ * MessageSize: The size of Protobuf
+ * raw_byte(MessageName): The name of the Protobuf message
+ * raw_byte(Protobuf): The Protobuf content
+ * 
+ */
 trait RpcSession { _: BcpSession[_, _] =>
 
-  protected def incomingServices: RpcSession.IncomingProxyRegistration[_ >: this.type]
-  
-  def outgoingService[Service](implicit entry: RpcSession.OutgoingProxyEntry[Service]): Service
+  import RpcSession._
+
+  protected def incomingServices: RpcSession.IncomingProxyRegistration
+
+  private val nextMessageId = new AtomicInteger(0)
+
+  private val outgoingRpcResponseHandlers = TrieMap.empty[Int, IResponseHandler]
+
+  final val outgoingProxy = new OutgoingProxy
+
+  final class OutgoingProxy {
+
+    final def handleReques[M <: GeneratedMessageLite](request: GeneratedMessageLite)(
+      successCallback: M => Unit,
+      failCallback: GeneratedMessageLite => Unit) = {
+      val messageId = nextMessageId.getAndIncrement()
+      val responseHandler = new IResponseHandler {
+        final override def onSuccess(message: GeneratedMessageLite): Unit = successCallback(message.asInstanceOf[M])
+
+        final override def onFailure(message: GeneratedMessageLite): Unit = failCallback(message)
+      }
+      outgoingRpcResponseHandlers.putIfAbsent(messageId, responseHandler) match {
+        case None => {
+          sendMessage(RpcSession.REQUEST, messageId, request)
+        }
+        case Some(oldFunction) => {
+          throw new IllegalStateException("")
+        }
+      }
+    }
+
+    final def handleEvent(event: GeneratedMessageLite): Unit = {
+      val messageId = nextMessageId.getAndIncrement()
+      sendMessage(RpcSession.EVENT, messageId, event)
+    }
+  }
+
+  private final def sendMessage(messageType: Int, messageId: Int, message: GeneratedMessageLite): Unit = {
+    val messageName = message.getClass.getName
+    val nameSize = messageName.size
+    val messageByteArray = message.toByteArray
+    val messageSize = messageByteArray.length
+    val byteBuffer = ByteBuffer.allocate(10 + nameSize + messageSize)
+    // TODO Can use Generator ?
+    byteBuffer.putInt(messageId)
+    byteBuffer.put(messageType.toByte)
+    byteBuffer.put(nameSize.toByte)
+    byteBuffer.putInt(messageSize)
+    // TODO Send the hash of the name, which can save network flow.
+    byteBuffer.put(messageName.getBytes)
+    byteBuffer.put(messageByteArray)
+    byteBuffer.flip()
+    send(byteBuffer)
+  }
+
+  override protected final def received(buffers: java.nio.ByteBuffer*): Unit = {
+    // TODO Can use Generator ?
+    val byteBufferInput = new ByteBufferInput(buffers.iterator)
+    val messageId = byteBufferInput.readInt()
+    val messageType = byteBufferInput.readByte()
+    val messageNameSize = byteBufferInput.readByte()
+    val messageSize = byteBufferInput.readInt()
+    val messageNameBytes = ByteBuffer.allocate(messageNameSize)
+    byteBufferInput.readBytes(messageNameBytes, 0, messageNameSize)
+    val messageName = new String(messageNameBytes.array, "UTF-8")
+    val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
+    val module = runtimeMirror.staticModule(messageName)
+    val messageObject = runtimeMirror.reflectModule(module).instance
+    val message = 
+      if(messageSize > 0) {
+        val messageByte = ByteBuffer.allocate(messageSize)
+        byteBufferInput.readBytes(messageByte, 0, messageSize)
+        // Parse message reflectively
+        val parseFrom = messageObject.getClass.getMethod("parseFrom", classOf[Array[Byte]])
+        parseFrom.invoke(messageObject, messageByte.array).asInstanceOf[GeneratedMessageLite]
+      }
+      else {
+        val newBuilder = messageObject.getClass.getMethod("newBuilder")
+        newBuilder.invoke(messageObject).asInstanceOf[GeneratedMessageLite]
+      }
+    val packageName = message.getClass.getPackage.getName
+    messageType match {
+      case RpcSession.REQUEST => {
+        incomingServices.incomingProxyMap.get(packageName) match {
+          case None => {
+            logger.severe("Unknown service name: " + messageName)
+            interrupt()
+          }
+          case Some(service) => {
+            val handleRequest = service.getClass.getMethod("handleRequest", message.getClass)
+            try {
+              val responseMessage = handleRequest.invoke(service, message).asInstanceOf[GeneratedMessageLite]
+              sendMessage(RpcSession.SUCCESS, messageId, responseMessage)
+            } catch {
+              case exception: InvocationTargetException =>
+                exception.getCause match {
+                  case errorCode: ErrorCode =>
+                    sendMessage(RpcSession.FAIL, messageId, errorCode.errorMessage)
+                  case e: Exception =>
+                    logger.severe("Fail: " + exception)
+                    interrupt()
+                }
+              case exception: Exception =>
+                logger.severe("Fail: " + exception)
+                interrupt()
+            }
+          }
+        }
+      }
+      case RpcSession.EVENT => {
+        incomingServices.incomingProxyMap.get(packageName) match {
+          case None => {
+            logger.severe("Unknown service name: " + messageName)
+            interrupt()
+          }
+          case Some(service) => {
+            val handleEvent = service.getClass.getMethod("handleEvent", message.getClass)
+            handleEvent.invoke(service, message)
+          }
+        }
+      }
+      case RpcSession.INFO => {
+        incomingServices.incomingProxyMap.get(packageName) match {
+          case None => {
+            logger.severe("Unknown service name: " + messageName)
+            interrupt()
+          }
+          case Some(service) => {
+            val handleInfo = service.getClass.getMethod("handleInfo", message.getClass)
+            handleInfo.invoke(service, message)
+          }
+        }
+      }
+      case RpcSession.SUCCESS => {
+        outgoingRpcResponseHandlers.remove(messageId) match {
+          case None => {
+            logger.severe(this + " Illegal rpc data: " + messageName)
+            interrupt()
+          }
+          case Some(handler) => {
+            handler.onSuccess(message)
+          }
+        }
+      }
+      case RpcSession.FAIL => {
+        outgoingRpcResponseHandlers.remove(messageId) match {
+          case None => {
+            logger.severe(this + " Illegal rpc data: " + messageName)
+            interrupt()
+          }
+          case Some(handler) => {
+            handler.onFailure(message)
+          }
+        }
+      }
+    }
+  }
 
 } 
