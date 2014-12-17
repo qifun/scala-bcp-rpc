@@ -74,6 +74,8 @@ object RpcSession {
  * raw_byte(MessageName): The name of the Protobuf message
  * raw_byte(Protobuf): The Protobuf content
  * 
+ * TODO Send the hash of the name, which can save network flow.
+ * 
  */
 trait RpcSession { _: BcpSession[_, _] =>
 
@@ -135,7 +137,6 @@ trait RpcSession { _: BcpSession[_, _] =>
     byteBuffer.put(messageType.toByte)
     byteBuffer.put(nameSize.toByte)
     byteBuffer.putInt(messageSize)
-    // TODO Send the hash of the name, which can save network flow.
     byteBuffer.put(messageName.getBytes)
     byteBuffer.put(messageByteArray)
     byteBuffer.flip()
