@@ -33,7 +33,6 @@ import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe._
 import com.google.protobuf.GeneratedMessageLite
 import java.lang.reflect.InvocationTargetException
-import com.qifun.common.myDemo.DemoRequest
 
 object RpcSession {
 
