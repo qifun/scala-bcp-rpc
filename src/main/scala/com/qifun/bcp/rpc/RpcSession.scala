@@ -60,6 +60,7 @@ object RpcSession {
   private[rpc] val FAIL = 2
   private[rpc] val EVENT = 3
   private[rpc] val INFO = 4
+  private[rpc] val CASTREQUEST = 5
 
 }
 
@@ -115,6 +116,11 @@ trait RpcSession { _: BcpSession[_, _] =>
     final def handleInfo(info: GeneratedMessageLite): Unit = {
       val messageId = nextMessageId.getAndIncrement()
       sendMessage(RpcSession.INFO, messageId, info) 
+    }
+    
+    final def handleCastRequest(castRequest: GeneratedMessageLite): Unit = {
+      val messageId = nextMessageId.getAndIncrement()
+      sendMessage(RpcSession.CASTREQUEST, messageId, castRequest)
     }
   }
 
@@ -187,6 +193,18 @@ trait RpcSession { _: BcpSession[_, _] =>
                 logger.severe("Fail: " + exception)
                 interrupt()
             }
+          }
+        }
+      }
+      case RpcSession.CASTREQUEST => {
+        incomingServices.incomingProxyMap.get(packageName) match {
+          case None => {
+            logger.severe("Unknown service name: " + messageName)
+            interrupt()
+          }
+          case Some(service) => {
+            val handleCastRequest = service.getClass.getMethod("handleCastRequest", message.getClass)
+            handleCastRequest.invoke(service, message)
           }
         }
       }
