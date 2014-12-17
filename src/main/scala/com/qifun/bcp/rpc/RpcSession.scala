@@ -111,6 +111,11 @@ trait RpcSession { _: BcpSession[_, _] =>
       val messageId = nextMessageId.getAndIncrement()
       sendMessage(RpcSession.EVENT, messageId, event)
     }
+    
+    final def handleInfo(info: GeneratedMessageLite): Unit = {
+      val messageId = nextMessageId.getAndIncrement()
+      sendMessage(RpcSession.INFO, messageId, info) 
+    }
   }
 
   private final def sendMessage(messageType: Int, messageId: Int, message: GeneratedMessageLite): Unit = {
