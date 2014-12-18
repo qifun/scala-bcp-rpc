@@ -92,7 +92,7 @@ trait RpcSession { _: BcpSession[_, _] =>
 
     final def handleReques[M <: GeneratedMessageLite](request: GeneratedMessageLite)(
       successCallback: M => Unit,
-      failCallback: GeneratedMessageLite => Unit) = {
+      failCallback: GeneratedMessageLite => Unit): Unit = {
       val handleRequestFuture = Future {
         val messageId = nextMessageId.getAndIncrement()
         val responseHandler = new IResponseHandler {
