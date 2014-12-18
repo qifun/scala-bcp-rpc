@@ -90,7 +90,7 @@ trait RpcSession { _: BcpSession[_, _] =>
 
   final class OutgoingProxy {
 
-    final def handleReques[M <: GeneratedMessageLite](request: GeneratedMessageLite)(
+    final def handleRequest[M <: GeneratedMessageLite](request: GeneratedMessageLite)(
       successCallback: M => Unit,
       failCallback: GeneratedMessageLite => Unit): Unit = {
       val handleRequestFuture = Future {
