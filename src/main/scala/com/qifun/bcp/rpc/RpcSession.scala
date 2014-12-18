@@ -64,10 +64,10 @@ object RpcSession {
 }
 
 /**
- * data format:
+ * Data format:
  * 32bit(Inc) + 8bit(Type) + 8bit(NameSize) + 32bit(MessageSize) + raw_byte(MessageName) + raw_byte(Protobuf)
  * Inc: Incremental id
- * Type: 0: REQUEST; 1: SUCCESS; 2: FAIL; 3: EVENT; 4: INFO;
+ * Type: 0: REQUEST; 1: SUCCESS; 2: FAIL; 3: EVENT; 4: INFO; 5: CASTREQUEST
  * NameSize: The size of MessageName
  * MessageSize: The size of Protobuf
  * raw_byte(MessageName): The name of the Protobuf message
