@@ -93,35 +93,71 @@ trait RpcSession { _: BcpSession[_, _] =>
     final def handleReques[M <: GeneratedMessageLite](request: GeneratedMessageLite)(
       successCallback: M => Unit,
       failCallback: GeneratedMessageLite => Unit) = {
-      val messageId = nextMessageId.getAndIncrement()
-      val responseHandler = new IResponseHandler {
-        final override def onSuccess(message: GeneratedMessageLite): Unit = successCallback(message.asInstanceOf[M])
+      val handleRequestFuture = Future {
+        val messageId = nextMessageId.getAndIncrement()
+        val responseHandler = new IResponseHandler {
+          final override def onSuccess(message: GeneratedMessageLite): Unit = successCallback(message.asInstanceOf[M])
 
-        final override def onFailure(message: GeneratedMessageLite): Unit = failCallback(message)
-      }
-      outgoingRpcResponseHandlers.putIfAbsent(messageId, responseHandler) match {
-        case None => {
-          sendMessage(RpcSession.REQUEST, messageId, request)
+          final override def onFailure(message: GeneratedMessageLite): Unit = failCallback(message)
         }
-        case Some(oldFunction) => {
-          throw new IllegalStateException("")
+        outgoingRpcResponseHandlers.putIfAbsent(messageId, responseHandler) match {
+          case None => {
+            sendMessage(RpcSession.REQUEST, messageId, request)
+          }
+          case Some(oldFunction) => {
+            throw new IllegalStateException("")
+          }
         }
       }
+      implicit def catcher: Catcher[Unit] = {
+        case exception: Exception => {
+          logger.severe("Handle request failed: " + exception)
+          interrupt()
+        }
+      }
+      for(_ <- handleRequestFuture) {}
     }
 
     final def handleEvent(event: GeneratedMessageLite): Unit = {
-      val messageId = nextMessageId.getAndIncrement()
-      sendMessage(RpcSession.EVENT, messageId, event)
+      val handleEventFuture = Future {
+        val messageId = nextMessageId.getAndIncrement()
+        sendMessage(RpcSession.EVENT, messageId, event)
+      }
+      implicit def catcher: Catcher[Unit] = {
+        case exception: Exception => {
+          logger.severe("Handle event failed: " + exception)
+          interrupt()
+        }
+      }
+      for(_ <- handleEventFuture) {}
     }
     
     final def handleInfo(info: GeneratedMessageLite): Unit = {
-      val messageId = nextMessageId.getAndIncrement()
-      sendMessage(RpcSession.INFO, messageId, info) 
+      val handleInfoFuture = Future {
+        val messageId = nextMessageId.getAndIncrement()
+        sendMessage(RpcSession.INFO, messageId, info)
+      }
+      implicit def catcher: Catcher[Unit] = {
+        case exception: Exception => {
+          logger.severe("Handle info failed: " + exception)
+          interrupt()
+        }
+      }
+      for(_ <- handleInfoFuture) {}
     }
     
     final def handleCastRequest(castRequest: GeneratedMessageLite): Unit = {
-      val messageId = nextMessageId.getAndIncrement()
-      sendMessage(RpcSession.CASTREQUEST, messageId, castRequest)
+      val handleCastRequestFuture = Future {
+        val messageId = nextMessageId.getAndIncrement()
+        sendMessage(RpcSession.CASTREQUEST, messageId, castRequest)
+      }
+      implicit def catcher: Catcher[Unit] = {
+        case exception: Exception => {
+          logger.severe("Handle cast request failed: " + exception)
+          interrupt()
+        }
+        for(_ <- handleCastRequestFuture) {}
+      }
     }
   }
 
@@ -144,117 +180,124 @@ trait RpcSession { _: BcpSession[_, _] =>
 
   override protected final def received(buffers: java.nio.ByteBuffer*): Unit = {
     // TODO Can use Generator ?
-    val byteBufferInput = new ByteBufferInput(buffers.iterator)
-    val messageId = byteBufferInput.readInt()
-    val messageType = byteBufferInput.readByte()
-    val messageNameSize = byteBufferInput.readByte()
-    val messageSize = byteBufferInput.readInt()
-    val messageNameBytes = ByteBuffer.allocate(messageNameSize)
-    byteBufferInput.readBytes(messageNameBytes, 0, messageNameSize)
-    val messageName = new String(messageNameBytes.array, "UTF-8")
-    val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
-    val module = runtimeMirror.staticModule(messageName)
-    val messageObject = runtimeMirror.reflectModule(module).instance
-    val message = 
-      if(messageSize > 0) {
-        val messageByte = ByteBuffer.allocate(messageSize)
-        byteBufferInput.readBytes(messageByte, 0, messageSize)
-        // Parse message reflectively
-        val parseFrom = messageObject.getClass.getMethod("parseFrom", classOf[Array[Byte]])
-        parseFrom.invoke(messageObject, messageByte.array).asInstanceOf[GeneratedMessageLite]
-      }
-      else {
-        val newBuilder = messageObject.getClass.getMethod("newBuilder")
-        newBuilder.invoke(messageObject).asInstanceOf[GeneratedMessageLite]
-      }
-    val packageName = message.getClass.getPackage.getName
-    messageType match {
-      case RpcSession.REQUEST => {
-        incomingServices.incomingProxyMap.get(packageName) match {
-          case None => {
-            logger.severe("Unknown service name: " + messageName)
-            interrupt()
+    val receivedFuture = Future {
+      val byteBufferInput = new ByteBufferInput(buffers.iterator)
+      val messageId = byteBufferInput.readInt()
+      val messageType = byteBufferInput.readByte()
+      val messageNameSize = byteBufferInput.readByte()
+      val messageSize = byteBufferInput.readInt()
+      val messageNameBytes = ByteBuffer.allocate(messageNameSize)
+      byteBufferInput.readBytes(messageNameBytes, 0, messageNameSize)
+      val messageName = new String(messageNameBytes.array, "UTF-8")
+      val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
+      val module = runtimeMirror.staticModule(messageName)
+      val messageObject = runtimeMirror.reflectModule(module).instance
+      val message = 
+        if(messageSize > 0) {
+          val messageByte = ByteBuffer.allocate(messageSize)
+          byteBufferInput.readBytes(messageByte, 0, messageSize)
+          // Parse message reflectively
+          val parseFrom = messageObject.getClass.getMethod("parseFrom", classOf[Array[Byte]])
+          parseFrom.invoke(messageObject, messageByte.array).asInstanceOf[GeneratedMessageLite]
+        }
+        else {
+          val newBuilder = messageObject.getClass.getMethod("newBuilder")
+          newBuilder.invoke(messageObject).asInstanceOf[GeneratedMessageLite]
+        }
+      val packageName = message.getClass.getPackage.getName
+      messageType match {
+        case RpcSession.REQUEST => {
+          incomingServices.incomingProxyMap.get(packageName) match {
+            case None => {
+              logger.severe("Unknown service name: " + messageName)
+              interrupt()
+            }
+            case Some(service) => {
+              val handleRequest = service.getClass.getMethod("handleRequest", message.getClass)
+              try {
+                val responseMessage = handleRequest.invoke(service, message).asInstanceOf[GeneratedMessageLite]
+                sendMessage(RpcSession.SUCCESS, messageId, responseMessage)
+              } catch {
+                case exception: InvocationTargetException =>
+                  exception.getCause match {
+                    case errorCode: ErrorCode =>
+                      sendMessage(RpcSession.FAIL, messageId, errorCode.errorMessage)
+                    case e: Exception =>
+                      throw e
+                  }
+                case exception: Exception =>
+                  throw exception
+              }
+            }
           }
-          case Some(service) => {
-            val handleRequest = service.getClass.getMethod("handleRequest", message.getClass)
-            try {
-              val responseMessage = handleRequest.invoke(service, message).asInstanceOf[GeneratedMessageLite]
-              sendMessage(RpcSession.SUCCESS, messageId, responseMessage)
-            } catch {
-              case exception: InvocationTargetException =>
-                exception.getCause match {
-                  case errorCode: ErrorCode =>
-                    sendMessage(RpcSession.FAIL, messageId, errorCode.errorMessage)
-                  case e: Exception =>
-                    logger.severe("Fail: " + exception)
-                    interrupt()
-                }
-              case exception: Exception =>
-                logger.severe("Fail: " + exception)
-                interrupt()
+        }
+        case RpcSession.CASTREQUEST => {
+          incomingServices.incomingProxyMap.get(packageName) match {
+            case None => {
+              logger.severe("Unknown service name: " + messageName)
+              interrupt()
+            }
+            case Some(service) => {
+              val handleCastRequest = service.getClass.getMethod("handleCastRequest", message.getClass)
+              handleCastRequest.invoke(service, message)
+            }
+          }
+        }
+        case RpcSession.EVENT => {
+          incomingServices.incomingProxyMap.get(packageName) match {
+            case None => {
+              logger.severe("Unknown service name: " + messageName)
+              interrupt()
+            }
+            case Some(service) => {
+              val handleEvent = service.getClass.getMethod("handleEvent", message.getClass)
+              handleEvent.invoke(service, message)
+            }
+          }
+        }
+        case RpcSession.INFO => {
+          incomingServices.incomingProxyMap.get(packageName) match {
+            case None => {
+              logger.severe("Unknown service name: " + messageName)
+              interrupt()
+            }
+            case Some(service) => {
+              val handleInfo = service.getClass.getMethod("handleInfo", message.getClass)
+              handleInfo.invoke(service, message)
+            }
+          }
+        }
+        case RpcSession.SUCCESS => {
+          outgoingRpcResponseHandlers.remove(messageId) match {
+            case None => {
+              logger.severe(this + " Illegal rpc data: " + messageName)
+              interrupt()
+            }
+            case Some(handler) => {
+              handler.onSuccess(message)
+            }
+          }
+        }
+        case RpcSession.FAIL => {
+          outgoingRpcResponseHandlers.remove(messageId) match {
+            case None => {
+              logger.severe(this + " Illegal rpc data: " + messageName)
+              interrupt()
+            }
+            case Some(handler) => {
+              handler.onFailure(message)
             }
           }
         }
       }
-      case RpcSession.CASTREQUEST => {
-        incomingServices.incomingProxyMap.get(packageName) match {
-          case None => {
-            logger.severe("Unknown service name: " + messageName)
-            interrupt()
-          }
-          case Some(service) => {
-            val handleCastRequest = service.getClass.getMethod("handleCastRequest", message.getClass)
-            handleCastRequest.invoke(service, message)
-          }
-        }
-      }
-      case RpcSession.EVENT => {
-        incomingServices.incomingProxyMap.get(packageName) match {
-          case None => {
-            logger.severe("Unknown service name: " + messageName)
-            interrupt()
-          }
-          case Some(service) => {
-            val handleEvent = service.getClass.getMethod("handleEvent", message.getClass)
-            handleEvent.invoke(service, message)
-          }
-        }
-      }
-      case RpcSession.INFO => {
-        incomingServices.incomingProxyMap.get(packageName) match {
-          case None => {
-            logger.severe("Unknown service name: " + messageName)
-            interrupt()
-          }
-          case Some(service) => {
-            val handleInfo = service.getClass.getMethod("handleInfo", message.getClass)
-            handleInfo.invoke(service, message)
-          }
-        }
-      }
-      case RpcSession.SUCCESS => {
-        outgoingRpcResponseHandlers.remove(messageId) match {
-          case None => {
-            logger.severe(this + " Illegal rpc data: " + messageName)
-            interrupt()
-          }
-          case Some(handler) => {
-            handler.onSuccess(message)
-          }
-        }
-      }
-      case RpcSession.FAIL => {
-        outgoingRpcResponseHandlers.remove(messageId) match {
-          case None => {
-            logger.severe(this + " Illegal rpc data: " + messageName)
-            interrupt()
-          }
-          case Some(handler) => {
-            handler.onFailure(message)
-          }
-        }
+    }
+    implicit def catcher: Catcher[Unit] = {
+      case exception: Exception => {
+        logger.severe("Handle received failed: " + exception)
+        interrupt()
       }
     }
+    for(_ <- receivedFuture) {}
   }
 
 } 
