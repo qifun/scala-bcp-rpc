@@ -41,7 +41,10 @@ object RpcSession {
   final case class IncomingProxyEntry(module: String, incomingService: RpcService)
   
   final case class ErrorCodeEntry[TMessage <: GeneratedMessageLite](errorCode: TMessage)
-
+    (implicit tag: TypeTag[TMessage]) {
+    final val errorTag: TypeTag[TMessage] = tag
+  }
+  
   object IncomingProxyRegistration {
     final def apply(incomingEntries: IncomingProxyEntry*) = {
       val map = (for {
@@ -61,7 +64,7 @@ object RpcSession {
       val map = (for { 
         errorCode <- errorCodes
       } yield {
-        errorCode.getClass.getName -> errorCode
+        errorCode.errorCode.getClass.getName -> errorCode
       })(collection.breakOut(Map.canBuildFrom))
       new ErrorCodeRegistration(map)
     }
@@ -170,6 +173,7 @@ trait RpcSession { _: BcpSession[_, _] =>
       byteBufferInput: ByteBufferInput,
       messageType: TypeTag[GeneratedMessageLite], 
       messageSize: Int) = {
+      println("$$$$$$$$$$$ " + messageType)
       val universeMirror = universe.runtimeMirror(getClass.getClassLoader)
       val messageObject = universeMirror.reflectModule(messageType.tpe.typeSymbol.companionSymbol.asModule).instance
       if(messageSize > 0) {
@@ -185,7 +189,7 @@ trait RpcSession { _: BcpSession[_, _] =>
 
   override protected final def received(buffers: java.nio.ByteBuffer*): Unit = {
     // TODO Can use Generator ?
-    val receivedFuture = Future {
+    // val receivedFuture = Future {
       val byteBufferInput = new ByteBufferInput(buffers.iterator)
       val messageId = byteBufferInput.readInt()
       val messageType = byteBufferInput.readByte()
@@ -215,6 +219,7 @@ trait RpcSession { _: BcpSession[_, _] =>
                     sendMessage(BcpRpc.SUCCESS, messageId, responseMessage)
                   } catch {
                     case errorCode: ErrorCode[_] =>
+                      println("errorCode: " + errorCode.errorMessage)
                       sendMessage(BcpRpc.FAIL, messageId, errorCode.errorMessage)
                     case exception: Exception =>
                       throw exception
@@ -265,24 +270,25 @@ trait RpcSession { _: BcpSession[_, _] =>
             case Some(handler) => {
               errorCodes.errorCodesMap.get(messageName) match {
                 case None => {
-                  logger.severe("Unknown service name: " + messageName)
+                  logger.severe("Unknown ErrorCode name: " + messageName)
                   interrupt()
                 }
                 case Some(errorCode) =>
-                  handler.onFailure(errorCode.errorCode)
+                  val error = bytesToMessage(byteBufferInput, errorCode.errorTag, messageSize)
+                  handler.onFailure(error)
               }
             }
           }
         }
       }
-    }
+/*    }
     implicit def catcher: Catcher[Unit] = {
       case exception: Exception => {
         logger.severe("Handle received failed: " + exception)
         interrupt()
       }
     }
-    for(_ <- receivedFuture) {}
+    for(_ <- receivedFuture) {}*/
   }
 
 } 
