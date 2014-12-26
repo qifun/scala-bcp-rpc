@@ -29,19 +29,21 @@ import net.sandrogrzicic.scalabuff.Message
 import com.qifun.statelessFuture.Future
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.concurrent.TrieMap
-import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe._
 import com.google.protobuf.GeneratedMessageLite
 import java.lang.reflect.InvocationTargetException
+import scala.reflect.runtime.universe
+import scala.reflect.runtime.universe.TypeTag
 
 object RpcSession {
 
   private implicit val (logger, formatter, appender) = ZeroLoggerFactory.newLogger(this)
 
-  final case class IncomingProxyEntry[Service <: IService](module: String, incomingService: Service)
+  final case class IncomingProxyEntry(module: String, incomingService: RpcService)
+  
+  final case class ErrorCodeEntry[TMessage <: GeneratedMessageLite](errorCode: TMessage)
 
   object IncomingProxyRegistration {
-    final def apply[Service <: IService](incomingEntries: IncomingProxyEntry[Service]*) = {
+    final def apply(incomingEntries: IncomingProxyEntry*) = {
       val map = (for {
         entry <- incomingEntries
       } yield {
@@ -51,15 +53,22 @@ object RpcSession {
     }
   }
 
-  final class IncomingProxyRegistration private (val incomingProxyMap: Map[String, IService])
+  final class IncomingProxyRegistration private (val incomingProxyMap: Map[String, RpcService])
     extends AnyVal // Do not extends AnyVal because of https://issues.scala-lang.org/browse/SI-8702
-
-  private[rpc] val REQUEST = 0
-  private[rpc] val SUCCESS = 1
-  private[rpc] val FAIL = 2
-  private[rpc] val EVENT = 3
-  private[rpc] val INFO = 4
-  private[rpc] val CASTREQUEST = 5
+    
+  object ErrorCodeRegistration {
+    final def apply(errorCodes: ErrorCodeEntry[GeneratedMessageLite]*) = {
+      val map = (for { 
+        errorCode <- errorCodes
+      } yield {
+        errorCode.getClass.getName -> errorCode
+      })(collection.breakOut(Map.canBuildFrom))
+      new ErrorCodeRegistration(map)
+    }
+  }
+  
+  final class ErrorCodeRegistration private (val errorCodesMap: Map[String, ErrorCodeEntry[GeneratedMessageLite]])
+    extends AnyVal
 
 }
 
@@ -67,7 +76,7 @@ object RpcSession {
  * Data format:
  * 32bit(Inc) + 8bit(Type) + 8bit(NameSize) + 32bit(MessageSize) + raw_byte(MessageName) + raw_byte(Protobuf)
  * Inc: Incremental id
- * Type: 0: REQUEST; 1: SUCCESS; 2: FAIL; 3: EVENT; 4: INFO; 5: CASTREQUEST
+ * Type: 0: REQUEST; 1: SUCCESS; 2: FAIL; 3: PUSHMESSAGE;
  * NameSize: The size of MessageName
  * MessageSize: The size of Protobuf
  * raw_byte(MessageName): The name of the Protobuf message
@@ -79,8 +88,11 @@ object RpcSession {
 trait RpcSession { _: BcpSession[_, _] =>
 
   import RpcSession._
+  import RpcService._
 
   protected def incomingServices: RpcSession.IncomingProxyRegistration
+  
+  protected def errorCodes: RpcSession.ErrorCodeRegistration
 
   private val nextMessageId = new AtomicInteger(0)
 
@@ -90,19 +102,22 @@ trait RpcSession { _: BcpSession[_, _] =>
 
   final class OutgoingProxy {
 
-    final def handleRequest[M <: GeneratedMessageLite](request: GeneratedMessageLite)(
+    final def sendRequest[M <: GeneratedMessageLite](request: GeneratedMessageLite)(
       successCallback: M => Unit,
-      failCallback: GeneratedMessageLite => Unit): Unit = {
+      failCallback: GeneratedMessageLite => Unit)(implicit responseTag: TypeTag[M]): Unit = {
       val handleRequestFuture = Future {
         val messageId = nextMessageId.getAndIncrement()
         val responseHandler = new IResponseHandler {
+          
+          final override def responseType = responseTag.asInstanceOf[TypeTag[GeneratedMessageLite]]
+          
           final override def onSuccess(message: GeneratedMessageLite): Unit = successCallback(message.asInstanceOf[M])
 
           final override def onFailure(message: GeneratedMessageLite): Unit = failCallback(message)
         }
         outgoingRpcResponseHandlers.putIfAbsent(messageId, responseHandler) match {
           case None => {
-            sendMessage(RpcSession.REQUEST, messageId, request)
+            sendMessage(BcpRpc.REQUEST, messageId, request)
           }
           case Some(oldFunction) => {
             throw new IllegalStateException("")
@@ -118,10 +133,10 @@ trait RpcSession { _: BcpSession[_, _] =>
       for(_ <- handleRequestFuture) {}
     }
 
-    final def handleEvent(event: GeneratedMessageLite): Unit = {
+    final def pushMessage(event: GeneratedMessageLite): Unit = {
       val handleEventFuture = Future {
         val messageId = nextMessageId.getAndIncrement()
-        sendMessage(RpcSession.EVENT, messageId, event)
+        sendMessage(BcpRpc.PUSHMESSAGE, messageId, event)
       }
       implicit def catcher: Catcher[Unit] = {
         case exception: Exception => {
@@ -132,33 +147,6 @@ trait RpcSession { _: BcpSession[_, _] =>
       for(_ <- handleEventFuture) {}
     }
     
-    final def handleInfo(info: GeneratedMessageLite): Unit = {
-      val handleInfoFuture = Future {
-        val messageId = nextMessageId.getAndIncrement()
-        sendMessage(RpcSession.INFO, messageId, info)
-      }
-      implicit def catcher: Catcher[Unit] = {
-        case exception: Exception => {
-          logger.severe("Handle info failed: " + exception)
-          interrupt()
-        }
-      }
-      for(_ <- handleInfoFuture) {}
-    }
-    
-    final def handleCastRequest(castRequest: GeneratedMessageLite): Unit = {
-      val handleCastRequestFuture = Future {
-        val messageId = nextMessageId.getAndIncrement()
-        sendMessage(RpcSession.CASTREQUEST, messageId, castRequest)
-      }
-      implicit def catcher: Catcher[Unit] = {
-        case exception: Exception => {
-          logger.severe("Handle cast request failed: " + exception)
-          interrupt()
-        }
-        for(_ <- handleCastRequestFuture) {}
-      }
-    }
   }
 
   private final def sendMessage(messageType: Int, messageId: Int, message: GeneratedMessageLite): Unit = {
@@ -177,6 +165,23 @@ trait RpcSession { _: BcpSession[_, _] =>
     byteBuffer.flip()
     send(byteBuffer)
   }
+  
+  private def bytesToMessage(
+      byteBufferInput: ByteBufferInput,
+      messageType: TypeTag[GeneratedMessageLite], 
+      messageSize: Int) = {
+      val universeMirror = universe.runtimeMirror(getClass.getClassLoader)
+      val messageObject = universeMirror.reflectModule(messageType.tpe.typeSymbol.companionSymbol.asModule).instance
+      if(messageSize > 0) {
+        val messageByte = ByteBuffer.allocate(messageSize)
+        byteBufferInput.readBytes(messageByte, 0, messageSize)
+        val parseFrom = messageObject.getClass.getMethod("parseFrom", classOf[Array[Byte]])
+        parseFrom.invoke(messageObject, messageByte.array).asInstanceOf[GeneratedMessageLite]
+      } else {
+        val newBuilder = messageObject.getClass.getMethod("newBuilder")
+        newBuilder.invoke(messageObject).asInstanceOf[GeneratedMessageLite]
+     }
+  }
 
   override protected final def received(buffers: java.nio.ByteBuffer*): Unit = {
     // TODO Can use Generator ?
@@ -189,103 +194,83 @@ trait RpcSession { _: BcpSession[_, _] =>
       val messageNameBytes = ByteBuffer.allocate(messageNameSize)
       byteBufferInput.readBytes(messageNameBytes, 0, messageNameSize)
       val messageName = new String(messageNameBytes.array, "UTF-8")
-      val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
-      val module = runtimeMirror.staticModule(messageName)
-      val messageObject = runtimeMirror.reflectModule(module).instance
-      val message = 
-        if(messageSize > 0) {
-          val messageByte = ByteBuffer.allocate(messageSize)
-          byteBufferInput.readBytes(messageByte, 0, messageSize)
-          // Parse message reflectively
-          val parseFrom = messageObject.getClass.getMethod("parseFrom", classOf[Array[Byte]])
-          parseFrom.invoke(messageObject, messageByte.array).asInstanceOf[GeneratedMessageLite]
-        }
-        else {
-          val newBuilder = messageObject.getClass.getMethod("newBuilder")
-          newBuilder.invoke(messageObject).asInstanceOf[GeneratedMessageLite]
-        }
-      val packageName = message.getClass.getPackage.getName
+      val packageName = messageName.substring(0, messageName.lastIndexOf("."))
       messageType match {
-        case RpcSession.REQUEST => {
+        case BcpRpc.REQUEST => {
           incomingServices.incomingProxyMap.get(packageName) match {
             case None => {
               logger.severe("Unknown service name: " + messageName)
               interrupt()
             }
             case Some(service) => {
-              val handleRequest = service.getClass.getMethod("handleRequest", message.getClass)
-              try {
-                val responseMessage = handleRequest.invoke(service, message).asInstanceOf[GeneratedMessageLite]
-                sendMessage(RpcSession.SUCCESS, messageId, responseMessage)
-              } catch {
-                case exception: InvocationTargetException =>
-                  exception.getCause match {
-                    case errorCode: ErrorCode =>
-                      sendMessage(RpcSession.FAIL, messageId, errorCode.errorMessage)
-                    case e: Exception =>
-                      throw e
+              service.incomingMessages.incomingMessagesMap.get(messageName) match {
+                case None => {
+                  logger.severe("Unknown message name: " + messageName)
+                  interrupt()
+                }
+                case Some(messageEntry: IncomingEntry) => {
+                  val message = bytesToMessage(byteBufferInput, messageEntry.messageType, messageSize)
+                  try {
+                    val responseMessage = messageEntry.executeRequest(message, service)
+                    sendMessage(BcpRpc.SUCCESS, messageId, responseMessage)
+                  } catch {
+                    case errorCode: ErrorCode[_] =>
+                      sendMessage(BcpRpc.FAIL, messageId, errorCode.errorMessage)
+                    case exception: Exception =>
+                      throw exception
                   }
-                case exception: Exception =>
-                  throw exception
+                }
               }
             }
           }
         }
-        case RpcSession.CASTREQUEST => {
+        case BcpRpc.PUSHMESSAGE => {
           incomingServices.incomingProxyMap.get(packageName) match {
             case None => {
               logger.severe("Unknown service name: " + messageName)
               interrupt()
             }
             case Some(service) => {
-              val handleCastRequest = service.getClass.getMethod("handleCastRequest", message.getClass)
-              handleCastRequest.invoke(service, message)
+              service.incomingMessages.incomingMessagesMap.get(messageName) match {
+                case None => {
+                  logger.severe("Unknown message name: " + messageName)
+                  interrupt()
+                }
+                case Some(messageEntry: IncomingEntry) => {
+                  val message = bytesToMessage(byteBufferInput, messageEntry.messageType, messageSize)
+                  messageEntry.executeMessage(message, service)
+                }
+              }
             }
           }
         }
-        case RpcSession.EVENT => {
-          incomingServices.incomingProxyMap.get(packageName) match {
-            case None => {
-              logger.severe("Unknown service name: " + messageName)
-              interrupt()
-            }
-            case Some(service) => {
-              val handleEvent = service.getClass.getMethod("handleEvent", message.getClass)
-              handleEvent.invoke(service, message)
-            }
-          }
-        }
-        case RpcSession.INFO => {
-          incomingServices.incomingProxyMap.get(packageName) match {
-            case None => {
-              logger.severe("Unknown service name: " + messageName)
-              interrupt()
-            }
-            case Some(service) => {
-              val handleInfo = service.getClass.getMethod("handleInfo", message.getClass)
-              handleInfo.invoke(service, message)
-            }
-          }
-        }
-        case RpcSession.SUCCESS => {
+        case BcpRpc.SUCCESS => {
           outgoingRpcResponseHandlers.remove(messageId) match {
             case None => {
               logger.severe(this + " Illegal rpc data: " + messageName)
               interrupt()
             }
             case Some(handler) => {
+              val message = bytesToMessage(byteBufferInput, handler.responseType, messageSize)
               handler.onSuccess(message)
             }
           }
         }
-        case RpcSession.FAIL => {
+        case BcpRpc.FAIL => {
           outgoingRpcResponseHandlers.remove(messageId) match {
             case None => {
               logger.severe(this + " Illegal rpc data: " + messageName)
               interrupt()
             }
             case Some(handler) => {
-              handler.onFailure(message)
+              errorCodes.errorCodesMap.get(messageName) match {
+                case None => {
+                  logger.severe("Unknown service name: " + messageName)
+                  interrupt()
+                }
+                case Some(errorCode) =>
+                  handler.onFailure(errorCode.errorCode)
+              }
             }
           }
         }

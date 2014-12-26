@@ -19,10 +19,15 @@ package com.qifun.bcp.rpc
 
 import net.sandrogrzicic.scalabuff.Message
 import com.google.protobuf.GeneratedMessageLite
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe._
 
 private[rpc] trait IResponseHandler {
+  
+  def responseType: TypeTag[GeneratedMessageLite]
   
   def onSuccess(message: GeneratedMessageLite): Unit
   
   def onFailure(message: GeneratedMessageLite): Unit
+  
 }

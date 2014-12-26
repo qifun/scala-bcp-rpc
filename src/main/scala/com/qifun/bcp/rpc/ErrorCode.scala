@@ -18,12 +18,15 @@
 package com.qifun.bcp.rpc
 
 import com.google.protobuf.GeneratedMessageLite
+import scala.reflect.ClassTag
 
-final class ErrorCode(final val errorMessage: GeneratedMessageLite) extends Throwable {
+final class ErrorCode[TError <: GeneratedMessageLite](
+    final val errorMessage: TError,
+    final val errorType: ClassTag[TError]) extends Throwable {
 }
 
 object ErrorCode {
-  def apply(errorMessage: GeneratedMessageLite) = {
-    new ErrorCode(errorMessage)
+  def apply[TError <: GeneratedMessageLite](errorMessage: TError)(implicit errorType: ClassTag[TError]) = {
+    new ErrorCode(errorMessage, errorType)
   }
 }
