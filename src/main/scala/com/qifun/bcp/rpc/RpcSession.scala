@@ -40,9 +40,15 @@ object RpcSession {
 
   final case class IncomingProxyEntry(module: String, incomingService: RpcService)
   
+  private[rpc] trait InternalErrorCode {
+    val errorMessage: GeneratedMessageLite
+    val errorTag: TypeTag[GeneratedMessageLite]
+  }
+  
   final case class ErrorCodeEntry[TMessage <: GeneratedMessageLite](errorCode: TMessage)
-    (implicit tag: TypeTag[TMessage]) {
-    final val errorTag: TypeTag[TMessage] = tag
+    (implicit tag: TypeTag[TMessage]) extends InternalErrorCode {
+    override final val errorMessage = errorCode
+    override final val errorTag = tag.asInstanceOf[TypeTag[GeneratedMessageLite]]
   }
   
   object IncomingProxyRegistration {
@@ -60,17 +66,17 @@ object RpcSession {
     extends AnyVal // Do not extends AnyVal because of https://issues.scala-lang.org/browse/SI-8702
     
   object ErrorCodeRegistration {
-    final def apply(errorCodes: ErrorCodeEntry[GeneratedMessageLite]*) = {
-      val map = (for { 
+    final def apply(errorCodes: InternalErrorCode*) = {
+      val map = (for {
         errorCode <- errorCodes
       } yield {
-        errorCode.errorCode.getClass.getName -> errorCode
+        errorCode.errorMessage.getClass.getName -> errorCode
       })(collection.breakOut(Map.canBuildFrom))
       new ErrorCodeRegistration(map)
     }
   }
-  
-  final class ErrorCodeRegistration private (val errorCodesMap: Map[String, ErrorCodeEntry[GeneratedMessageLite]])
+    
+  final class ErrorCodeRegistration private (val errorCodesMap: Map[String, InternalErrorCode])
     extends AnyVal
 
 }
@@ -188,7 +194,7 @@ trait RpcSession { _: BcpSession[_, _] =>
 
   override protected final def received(buffers: java.nio.ByteBuffer*): Unit = {
     // TODO Can use Generator ?
-    // val receivedFuture = Future {
+    val receivedFuture = Future {
       val byteBufferInput = new ByteBufferInput(buffers.iterator)
       val messageId = byteBufferInput.readInt()
       val messageType = byteBufferInput.readByte()
@@ -280,14 +286,14 @@ trait RpcSession { _: BcpSession[_, _] =>
           }
         }
       }
-/*    }
+    }
     implicit def catcher: Catcher[Unit] = {
       case exception: Exception => {
         logger.severe("Handle received failed: " + exception)
         interrupt()
       }
     }
-    for(_ <- receivedFuture) {}*/
+    for(_ <- receivedFuture) {}
   }
 
 } 
