@@ -224,7 +224,6 @@ trait RpcSession { _: BcpSession[_, _] =>
                     sendMessage(BcpRpc.SUCCESS, messageId, responseMessage)
                   } catch {
                     case errorCode: ErrorCode[_] =>
-                      println("errorCode: " + errorCode.errorMessage)
                       sendMessage(BcpRpc.FAIL, messageId, errorCode.errorMessage)
                     case exception: Exception =>
                       throw exception
