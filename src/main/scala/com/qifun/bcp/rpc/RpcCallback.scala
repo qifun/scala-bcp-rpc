@@ -21,8 +21,8 @@ import com.google.protobuf.GeneratedMessageLite
 
 private[rpc] final object RpcCallback {
 
-  type RequestCallback[TRequest <: GeneratedMessageLite, TService <: RpcService, TResponse <: GeneratedMessageLite] = Function2[TRequest, TService, TResponse]
+  type RequestCallback[TRequest <: GeneratedMessageLite, TSession <: RpcSession, TResponse <: GeneratedMessageLite] = Function2[TRequest, TSession, TResponse]
 
-  type MessageCallback[TMessage <: GeneratedMessageLite, TService <: RpcService] = Function2[TMessage, TService, Unit]
+  type MessageCallback[TMessage <: GeneratedMessageLite, TSession <: RpcSession] = Function2[TMessage, TSession, Unit]
 
 }

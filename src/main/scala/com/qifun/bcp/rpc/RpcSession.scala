@@ -220,10 +220,11 @@ trait RpcSession { _: BcpSession[_, _] =>
                 case Some(messageEntry: IncomingEntry) => {
                   val message = bytesToMessage(byteBufferInput, messageEntry.messageType, messageSize)
                   try {
-                    val responseMessage = messageEntry.executeRequest(message, service)
+                    val responseMessage = messageEntry.executeRequest(message, this)
                     sendMessage(BcpRpc.SUCCESS, messageId, responseMessage)
                   } catch {
                     case errorCode: ErrorCode[_] =>
+                      println("errorCode: " + errorCode.errorMessage)
                       sendMessage(BcpRpc.FAIL, messageId, errorCode.errorMessage)
                     case exception: Exception =>
                       throw exception
@@ -247,7 +248,7 @@ trait RpcSession { _: BcpSession[_, _] =>
                 }
                 case Some(messageEntry: IncomingEntry) => {
                   val message = bytesToMessage(byteBufferInput, messageEntry.messageType, messageSize)
-                  messageEntry.executeMessage(message, service)
+                  messageEntry.executeMessage(message, this)
                 }
               }
             }

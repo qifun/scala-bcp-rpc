@@ -40,32 +40,32 @@ object RpcService {
 
   abstract class IncomingEntry(val messageType: TypeTag[GeneratedMessageLite]) {
 
-    def executeRequest(message: GeneratedMessageLite, service: RpcService): GeneratedMessageLite
+    def executeRequest(message: GeneratedMessageLite, session: RpcSession): GeneratedMessageLite
 
-    def executeMessage(message: GeneratedMessageLite, service: RpcService): Unit
+    def executeMessage(message: GeneratedMessageLite, session: RpcSession): Unit
 
   }
 
-  final case class IncomingRequestEntry[TRequest <: GeneratedMessageLite, TService <: RpcService, TResponse <: GeneratedMessageLite](
-    val requestCallback: RequestCallback[TRequest, TService, TResponse])(implicit requestTag: TypeTag[TRequest])
+  final case class IncomingRequestEntry[TRequest <: GeneratedMessageLite, TSession <: RpcSession, TResponse <: GeneratedMessageLite](
+    val requestCallback: RequestCallback[TRequest, TSession, TResponse])(implicit requestTag: TypeTag[TRequest])
     extends IncomingEntry(requestTag.asInstanceOf[TypeTag[GeneratedMessageLite]]) {
     
-    override final def executeRequest(message: GeneratedMessageLite, service: RpcService): GeneratedMessageLite = {
-      requestCallback(message.asInstanceOf[TRequest], service.asInstanceOf[TService])
+    override final def executeRequest(message: GeneratedMessageLite, session: RpcSession): GeneratedMessageLite = {
+      requestCallback(message.asInstanceOf[TRequest], session.asInstanceOf[TSession])
     }
 
-    override final def executeMessage(message: GeneratedMessageLite, service: RpcService): Unit = ???
+    override final def executeMessage(message: GeneratedMessageLite, session: RpcSession): Unit = ???
 
   }
 
-  final case class IncomingMessageEntry[TMessage <: GeneratedMessageLite, TService <: RpcService](
-    val messageCallback: MessageCallback[TMessage, TService])(implicit messageTag: TypeTag[TMessage])
+  final case class IncomingMessageEntry[TMessage <: GeneratedMessageLite, TSession <: RpcSession](
+    val messageCallback: MessageCallback[TMessage, TSession])(implicit messageTag: TypeTag[TMessage])
     extends IncomingEntry(messageTag.asInstanceOf[TypeTag[GeneratedMessageLite]]) {
 
-    override final def executeRequest(message: GeneratedMessageLite, service: RpcService): GeneratedMessageLite = ???
+    override final def executeRequest(message: GeneratedMessageLite, session: RpcSession): GeneratedMessageLite = ???
 
-    override final def executeMessage(message: GeneratedMessageLite, service: RpcService): Unit = {
-      messageCallback(message.asInstanceOf[TMessage], service.asInstanceOf[TService])
+    override final def executeMessage(message: GeneratedMessageLite, session: RpcSession): Unit = {
+      messageCallback(message.asInstanceOf[TMessage], session.asInstanceOf[TSession])
     }
   }
 
