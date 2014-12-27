@@ -50,11 +50,11 @@ object RpcService {
     val requestCallback: RequestCallback[TRequest, TService, GeneratedMessageLite])(implicit requestTag: TypeTag[TRequest])
     extends IncomingEntry(requestTag.asInstanceOf[TypeTag[GeneratedMessageLite]]) {
     
-    override def executeRequest(message: GeneratedMessageLite, service: RpcService): GeneratedMessageLite = {
+    override final def executeRequest(message: GeneratedMessageLite, service: RpcService): GeneratedMessageLite = {
       requestCallback(message.asInstanceOf[TRequest], service.asInstanceOf[TService])
     }
 
-    override def executeMessage(message: GeneratedMessageLite, service: RpcService): Unit = ???
+    override final def executeMessage(message: GeneratedMessageLite, service: RpcService): Unit = ???
 
   }
 
@@ -62,9 +62,9 @@ object RpcService {
     val messageCallback: MessageCallback[TMessage, TService])(implicit messageTag: TypeTag[TMessage])
     extends IncomingEntry(messageTag.asInstanceOf[TypeTag[GeneratedMessageLite]]) {
 
-    def executeRequest(message: GeneratedMessageLite, service: RpcService): GeneratedMessageLite = ???
+    override final def executeRequest(message: GeneratedMessageLite, service: RpcService): GeneratedMessageLite = ???
 
-    override def executeMessage(message: GeneratedMessageLite, service: RpcService): Unit = {
+    override final def executeMessage(message: GeneratedMessageLite, service: RpcService): Unit = {
       messageCallback(message.asInstanceOf[TMessage], service.asInstanceOf[TService])
     }
   }
