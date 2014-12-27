@@ -46,8 +46,8 @@ object RpcService {
 
   }
 
-  final case class IncomingRequestEntry[TRequest <: GeneratedMessageLite, TService <: RpcService](
-    val requestCallback: RequestCallback[TRequest, TService, GeneratedMessageLite])(implicit requestTag: TypeTag[TRequest])
+  final case class IncomingRequestEntry[TRequest <: GeneratedMessageLite, TService <: RpcService, TResponse <: GeneratedMessageLite](
+    val requestCallback: RequestCallback[TRequest, TService, TResponse])(implicit requestTag: TypeTag[TRequest])
     extends IncomingEntry(requestTag.asInstanceOf[TypeTag[GeneratedMessageLite]]) {
     
     override final def executeRequest(message: GeneratedMessageLite, service: RpcService): GeneratedMessageLite = {
