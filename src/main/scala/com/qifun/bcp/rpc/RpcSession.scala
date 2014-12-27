@@ -173,7 +173,6 @@ trait RpcSession { _: BcpSession[_, _] =>
       byteBufferInput: ByteBufferInput,
       messageType: TypeTag[GeneratedMessageLite], 
       messageSize: Int) = {
-      println("$$$$$$$$$$$ " + messageType)
       val universeMirror = universe.runtimeMirror(getClass.getClassLoader)
       val messageObject = universeMirror.reflectModule(messageType.tpe.typeSymbol.companionSymbol.asModule).instance
       if(messageSize > 0) {
