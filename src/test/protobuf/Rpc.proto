@@ -1,0 +1,19 @@
+package com.qifun.common.rpctest;
+
+// 一个Request对应一个Response
+message RpcTestRequest {
+		optional int32 id = 1;
+}
+
+// 一个Request对应一个Response
+message RpcTestResponse {
+		optional int32 id = 1;
+}
+
+// 事件
+message RpcTestEvent {
+}
+
+// 数据
+message RpcTestInfo {
+}
