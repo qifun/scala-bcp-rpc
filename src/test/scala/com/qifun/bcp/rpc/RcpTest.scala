@@ -40,8 +40,10 @@ class RcpTest {
 
   @Test
   def pingPong(): Unit = {
-    var clientResult: Option[Int] = None
-    var serverResult: Option[Int] = None
+    val lock = new AnyRef
+    @volatile var clientResult: Option[Int] = None
+    @volatile var serverResult: Option[Int] = None
+    @volatile var eventResult: Option[Int] = None
     val client = new RpcClient
     val server = new RpcServer {
 
@@ -53,11 +55,19 @@ class RcpTest {
         final def handleRpcRequest(
           message: RpcTestRequest,
           session: RpcTestServerSession): RpcTestResponse = {
-          serverResult = message.id
+          lock.synchronized {
+            serverResult = message.id
+            lock.notify()
+          }
           new RpcTestResponse(Some(123321))
         }
 
-        final def handleRpcEvent(event: RpcTestEvent, service: RpcTestServerSession): Unit = {}
+        final def handleRpcEvent(event: RpcTestEvent, service: RpcTestServerSession): Unit = {
+          lock.synchronized {
+            eventResult = event.id
+            lock.notify()
+          }
+        }
       }
 
       final class TestService(val session: RpcTestServerSession) extends RpcService {
@@ -92,25 +102,36 @@ class RcpTest {
 
     client.start()
     def ping(): Unit = {
+
       val sendMsg = new RpcTestRequest(Some(321123))
-      client.outgoingProxy.pushMessage(new RpcTestEvent)
+      val sendEvent = new RpcTestEvent(Some(1048576))
+      client.outgoingProxy.pushMessage(sendEvent)
       client.outgoingProxy.sendRequest(sendMsg)((message: RpcTestResponse) => {
-        clientResult = message.id
+        lock.synchronized {
+          clientResult = message.id
+          lock.notify()
+        }
       }, (message: GeneratedMessageLite) => {
         message match {
           case message: RpcTestException =>
-            clientResult = Some(RpcTestException.CODE_FIELD_NUMBER)
+            lock.synchronized {
+              clientResult = Some(RpcTestException.CODE_FIELD_NUMBER)
+              lock.notify()
+            }
         }
       })
     }
     ping()
-    
-    while (clientResult == None || serverResult == None) {
-      Thread.sleep(100)
+
+    lock.synchronized {
+      while (serverResult == None || clientResult == None || eventResult == None) {
+        lock.wait()
+      }
     }
-    
+
     assertEquals(clientResult, Some(123321))
     assertEquals(serverResult, Some(321123))
+    assertEquals(eventResult, Some(1048576))
   }
 }
 

@@ -12,6 +12,7 @@ message RpcTestResponse {
 
 // 事件
 message RpcTestEvent {
+		optional string str = "this is a event!";
 }
 
 // 数据
