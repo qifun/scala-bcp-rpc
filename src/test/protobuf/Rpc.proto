@@ -1,4 +1,4 @@
-package com.qifun.common.rpcTest;
+package com.qifun.common.rpctest;
 
 // 一个Request对应一个Response
 message RpcTestRequest {
@@ -12,7 +12,7 @@ message RpcTestResponse {
 
 // 事件
 message RpcTestEvent {
-		optional int32 id = 1024;
+		optional string str = "this is a event!";
 }
 
 // 数据
