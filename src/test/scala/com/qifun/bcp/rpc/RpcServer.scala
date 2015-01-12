@@ -13,9 +13,10 @@ import java.util.concurrent.Executors
 import java.io.IOException
 import scala.util.control.Exception.Catcher
 import com.dongxiguo.zeroLog._
+import java.util.concurrent.TimeUnit
 
 abstract class RpcServer extends BcpServer {
-  
+
   final object RpcTestServerSession {
     val Exceptions = RpcSession.ErrorCodeRegistration(RpcSession.ErrorCodeEntry(new RpcTestException))
   }
@@ -43,6 +44,14 @@ abstract class RpcServer extends BcpServer {
     }
   }
 
+  final def clear() {
+    serverSocket.close()
+    channelGroup.shutdown()
+    if (!executor.awaitTermination(1, TimeUnit.SECONDS)) {
+      executor.shutdownNow()
+    }
+  }
+  
   serverSocket.bind(new java.net.InetSocketAddress(3333))
   startAccept(serverSocket)
 }

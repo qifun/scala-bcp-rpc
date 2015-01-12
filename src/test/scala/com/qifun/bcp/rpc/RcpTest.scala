@@ -132,6 +132,9 @@ class RcpTest {
     assertEquals(clientResult, Some(123321))
     assertEquals(serverResult, Some(321123))
     assertEquals(eventResult, Some(1048576))
+    
+    client.shutedDown()
+    server.clear()
   }
 }
 
