@@ -1,4 +1,4 @@
-package com.qifun.common.rpctest;
+package com.qifun.common.rpcTest;
 
 enum RpcTestErrorCodes {
 	ErrorOne = 1;
