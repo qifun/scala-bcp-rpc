@@ -3,7 +3,7 @@ package com.qifun.bcp.rpc
 import com.qifun.statelessFuture._
 import com.qifun.statelessFuture.util.io.Nio2Future
 import com.qifun.bcp._
-import com.qifun.common.rpctest._
+import com.qifun.common.rpcTest._
 import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel

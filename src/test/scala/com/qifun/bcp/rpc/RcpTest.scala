@@ -26,7 +26,7 @@ import scala.concurrent.stm.Ref
 import scala.concurrent.stm._
 import java.util.concurrent.TimeUnit
 import com.qifun.bcp.BcpServer
-import com.qifun.common.rpctest._
+import com.qifun.common.rpcTest._
 import scala.util.control.Exception.Catcher
 import com.qifun.bcp._
 import com.google.protobuf.GeneratedMessageLite
