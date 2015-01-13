@@ -44,7 +44,6 @@ class RcpTest {
     @volatile var clientResult: Option[Int] = None
     @volatile var serverResult: Option[Int] = None
     @volatile var eventResult: Option[Int] = None
-    val client = new RpcClient
     val server = new RpcServer {
 
       final object TestService {
@@ -100,6 +99,17 @@ class RcpTest {
         new Session(id) with RpcTestServerSession with RpcSession
     }
 
+    val client = new RpcClient {
+      override final def connect(): Future[AsynchronousSocketChannel] = Future[AsynchronousSocketChannel] {
+        val socket = AsynchronousSocketChannel.open()
+        Nio2Future.connect(
+          socket,
+          new InetSocketAddress("localhost",
+            server.serverSocket.getLocalAddress.asInstanceOf[InetSocketAddress].getPort)).await
+        socket
+      }
+    }
+
     client.start()
     def ping(): Unit = {
 
@@ -132,7 +142,7 @@ class RcpTest {
     assertEquals(clientResult, Some(123321))
     assertEquals(serverResult, Some(321123))
     assertEquals(eventResult, Some(1048576))
-    
+
     client.shutedDown()
     server.clear()
   }

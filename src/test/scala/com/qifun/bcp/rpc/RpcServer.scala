@@ -3,8 +3,8 @@ package com.qifun.bcp.rpc
 import com.qifun.statelessFuture._
 import com.qifun.statelessFuture.util.io.Nio2Future
 import com.qifun.bcp._
-import com.qifun.common.rpctest._
 import java.nio.channels.AsynchronousChannelGroup
+import com.qifun.common.rpctest._
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.net.InetSocketAddress
@@ -51,7 +51,7 @@ abstract class RpcServer extends BcpServer {
       executor.shutdownNow()
     }
   }
-  
-  serverSocket.bind(new java.net.InetSocketAddress(3333))
+
+  serverSocket.bind(null)
   startAccept(serverSocket)
 }
