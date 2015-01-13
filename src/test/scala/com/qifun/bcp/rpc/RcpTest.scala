@@ -26,7 +26,7 @@ import scala.concurrent.stm.Ref
 import scala.concurrent.stm._
 import java.util.concurrent.TimeUnit
 import com.qifun.bcp.BcpServer
-import com.qifun.common.rpctest._
+import com.qifun.bcp.rpc.test._
 import scala.util.control.Exception.Catcher
 import com.qifun.bcp._
 import com.google.protobuf.GeneratedMessageLite
@@ -78,7 +78,7 @@ class RcpTest {
       trait RpcTestServerSession extends RpcSession { _: BcpServer#Session =>
 
         private def incomingServiceEntries = RpcSession.IncomingProxyRegistration(
-          RpcSession.IncomingProxyEntry("com.qifun.common.rpctest", new TestService(this)))
+          RpcSession.IncomingProxyEntry("com.qifun.bcp.rpc.test", new TestService(this)))
 
         protected def errorCodes = RpcTestServerSession.Exceptions
 

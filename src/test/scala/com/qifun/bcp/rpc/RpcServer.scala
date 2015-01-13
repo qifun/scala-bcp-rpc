@@ -4,7 +4,7 @@ import com.qifun.statelessFuture._
 import com.qifun.statelessFuture.util.io.Nio2Future
 import com.qifun.bcp._
 import java.nio.channels.AsynchronousChannelGroup
-import com.qifun.common.rpctest._
+import com.qifun.bcp.rpc.test._
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.net.InetSocketAddress
