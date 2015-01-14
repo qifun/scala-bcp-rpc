@@ -289,7 +289,7 @@ trait RpcSession { _: BcpSession[_, _] =>
     }
     implicit def catcher: Catcher[Unit] = {
       case exception: Exception => {
-        logger.severe("Handle received failed: " + exception)
+        logger.severe("Handle received failed: " + exception.printStackTrace())
         interrupt()
       }
     }
