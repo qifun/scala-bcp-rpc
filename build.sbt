@@ -8,6 +8,8 @@ libraryDependencies += "com.qifun" %% "scala-bcp" % "0.1.0"
 
 libraryDependencies += "net.sandrogrzicic" %% "scalabuff-runtime" % "1.3.8"
 
+libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % Test
+
 scalacOptions += "-feature"
 
 version := "0.2.0-SNAPSHOT"
