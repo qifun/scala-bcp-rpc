@@ -126,7 +126,7 @@ trait RpcSession { _: BcpSession[_, _] =>
         }
         outgoingRpcResponseHandlers.putIfAbsent(messageId, responseHandler) match {
           case None => {
-            sendMessage(BcpRpc.REQUEST, messageId, request)
+            sendMessage(BcpRpc.REQUEST, messageId, request.getClass.getName,request.toByteArray)
           }
           case Some(oldFunction) => {
             throw new IllegalStateException("")
@@ -170,7 +170,21 @@ trait RpcSession { _: BcpSession[_, _] =>
     final def pushMessage(event: GeneratedMessageLite): Unit = {
       val handleEventFuture = Future {
         val messageId = nextMessageId.getAndIncrement()
-        sendMessage(BcpRpc.PUSHMESSAGE, messageId, event)
+        sendMessage(BcpRpc.PUSHMESSAGE, messageId, event.getClass.getName,event.toByteArray)
+      }
+      implicit def catcher: Catcher[Unit] = {
+        case exception: Exception => {
+          logger.severe("Handle event failed: " + exception)
+          interrupt()
+        }
+      }
+      for(_ <- handleEventFuture) {}
+    }
+    
+    final def pushMessage(messageName: String,messageByteArray: Array[Byte]): Unit = {
+      val handleEventFuture = Future {
+        val messageId = nextMessageId.getAndIncrement()
+        sendMessage(BcpRpc.PUSHMESSAGE, messageId, messageName,messageByteArray)
       }
       implicit def catcher: Catcher[Unit] = {
         case exception: Exception => {
@@ -182,14 +196,11 @@ trait RpcSession { _: BcpSession[_, _] =>
     }
     
   }
-
-  private final def sendMessage(messageType: Int, messageId: Int, message: GeneratedMessageLite): Unit = {
-    val messageName = message.getClass.getName
+  
+  private final def sendMessage(messageType: Int, messageId: Int, messageName: String, messageByteArray: Array[Byte]):Unit = {
     val nameSize = messageName.size
-    val messageByteArray = message.toByteArray
     val messageSize = messageByteArray.length
     val byteBuffer = ByteBuffer.allocate(10 + nameSize + messageSize)
-    // TODO Can use Generator ?
     byteBuffer.putInt(messageId)
     byteBuffer.put(messageType.toByte)
     byteBuffer.put(nameSize.toByte)
@@ -246,10 +257,10 @@ trait RpcSession { _: BcpSession[_, _] =>
                   val message = bytesToMessage(byteBufferInput, messageEntry.messageType, messageSize)
                   try {
                     val responseMessage = messageEntry.executeRequest(message, this)
-                    sendMessage(BcpRpc.SUCCESS, messageId, responseMessage)
+                    sendMessage(BcpRpc.SUCCESS, messageId, responseMessage.getClass.getName,responseMessage.toByteArray)
                   } catch {
                     case errorCode: ErrorCode[_] =>
-                      sendMessage(BcpRpc.FAIL, messageId, errorCode.errorMessage)
+                      sendMessage(BcpRpc.FAIL, messageId, errorCode.errorMessage.getClass.getName,errorCode.errorMessage.toByteArray)
                     case exception: Exception =>
                       logger.severe("Handle request exception: " + exception)
                   }
