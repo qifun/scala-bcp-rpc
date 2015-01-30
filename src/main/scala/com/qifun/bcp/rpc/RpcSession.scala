@@ -146,27 +146,27 @@ trait RpcSession { _: BcpSession[_, _] =>
       successCallback: M => Unit,
       failCallback: GeneratedMessageLite => Unit)(implicit responseTag: TypeTag[M]): Unit = {
       val lock = new AnyRef
-      @volatile var wait: Option[Boolean] = Some(false)
+      @volatile var isReceived: Option[Boolean] = Some(false)
       sendRequest(request)((message: M) => {
-        lock.synchronized{
-          wait = Some(true)
+        lock.synchronized {
+          isReceived = Some(true)
           successCallback(message)
           lock.notify()
         }
       }, (message: GeneratedMessageLite) => {
-        lock.synchronized{
-          wait= Some(true)
+        lock.synchronized {
+          isReceived = Some(true)
           failCallback(message)
           lock.notify()
         }
       })
-      lock.synchronized{
-        while(wait == Some(false)){
+      lock.synchronized {
+        while(isReceived == Some(false)) {
           lock.wait()
-          }
+        }
       }
     }
-    
+
     final def pushMessage(event: GeneratedMessageLite): Unit = {
       val handleEventFuture = Future {
         val messageId = nextMessageId.getAndIncrement()
