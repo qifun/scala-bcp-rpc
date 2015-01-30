@@ -141,7 +141,32 @@ trait RpcSession { _: BcpSession[_, _] =>
       }
       for(_ <- handleRequestFuture) {}
     }
-
+    
+    final def blockingSendRequest[M <: GeneratedMessageLite](request: GeneratedMessageLite)(
+      successCallback: M => Unit,
+      failCallback: GeneratedMessageLite => Unit)(implicit responseTag: TypeTag[M]): Unit = {
+      val lock = new AnyRef
+      @volatile var wait: Option[Boolean] = Some(false)
+      sendRequest(request)((message: M) => {
+        lock.synchronized{
+          wait = Some(true)
+          successCallback(message)
+          lock.notify()
+        }
+      }, (message: GeneratedMessageLite) => {
+        lock.synchronized{
+          wait= Some(true)
+          failCallback(message)
+          lock.notify()
+        }
+      })
+      lock.synchronized{
+        while(wait == Some(false)){
+          lock.wait()
+          }
+      }
+    }
+    
     final def pushMessage(event: GeneratedMessageLite): Unit = {
       val handleEventFuture = Future {
         val messageId = nextMessageId.getAndIncrement()
