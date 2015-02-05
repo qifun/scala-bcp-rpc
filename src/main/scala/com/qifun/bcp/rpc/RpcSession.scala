@@ -135,7 +135,7 @@ trait RpcSession { _: BcpSession[_, _] =>
       }
       implicit def catcher: Catcher[Unit] = {
         case exception: Exception => {
-          logger.severe("Handle request failed: " + exception)
+          logger.severe("Handle request failed: " + exception.printStackTrace)
           interrupt()
         }
       }
@@ -174,7 +174,7 @@ trait RpcSession { _: BcpSession[_, _] =>
       }
       implicit def catcher: Catcher[Unit] = {
         case exception: Exception => {
-          logger.severe("Handle event failed: " + exception)
+          logger.severe("Handle event failed: " + exception.printStackTrace)
           interrupt()
         }
       }
@@ -188,7 +188,7 @@ trait RpcSession { _: BcpSession[_, _] =>
       }
       implicit def catcher: Catcher[Unit] = {
         case exception: Exception => {
-          logger.severe("Handle event failed: " + exception)
+          logger.severe("Handle event failed: " + exception.printStackTrace)
           interrupt()
         }
       }
@@ -262,7 +262,7 @@ trait RpcSession { _: BcpSession[_, _] =>
                     case errorCode: ErrorCode[_] =>
                       sendMessage(BcpRpc.FAIL, messageId, errorCode.errorMessage.getClass.getName,errorCode.errorMessage.toByteArray)
                     case exception: Exception =>
-                      logger.severe("Handle request exception: " + exception)
+                      logger.severe("Handle request exception: " + exception.printStackTrace)
                   }
                 }
               }
